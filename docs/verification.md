@@ -5,14 +5,15 @@
 ## 已执行并通过
 
 - TypeScript：`npm run check`。
-- `npm test`：31 项通过；Miniflare 实际本地 D1/R2。覆盖并发防超支、幂等冻结/消费/失败释放、等级校验、图片所有权/审核、同时任务限制、支付重复/乱序/退款/降级规则、官方 SDK RSA 验签/篡改/过期、商品金额环境、provider 请求映射、登录权限、CSRF、文件头、签名过期、删除后重放、队列超时竞态、unknown 冻结保护、MP4 文件下载与后台补偿审计。
-- `npx vinext check`：12 supported、0 partial、0 issues，100% compatibility report；这是工具静态检查，不替代真实 OAuth/支付端到端验证。
+- `npm test`：44 项通过；原有 31 项使用 Miniflare 实际本地 D1/R2。覆盖并发防超支、幂等冻结/消费/失败释放、等级校验、图片所有权/审核、同时任务限制、支付重复/乱序/退款/降级规则、官方 SDK RSA 验签/篡改/过期、商品金额环境、provider 请求映射、登录权限、CSRF、文件头、签名过期、删除后重放、队列超时竞态、unknown 冻结保护、MP4 文件下载与后台补偿审计。新增 13 项监控保护测试，验证开发/测试环境不输出引导、生产引导在本地 IPv4/IPv6/局域网和预览域名不创建监控脚本，以及正式 origin 的正确 ID、初始化队列与去重；使用 VM 模拟浏览器，不下载或执行真实监控。
+- `npx vinext check`：13 supported、0 partial、0 issues，100% compatibility report；这是工具静态检查，不替代真实 OAuth/支付端到端验证。
 - `npm run db:generate`：15 表，No schema changes；本地迁移已应用、Mock R2 fixture 已写入。
 - `npm run build`：Cloudflare workerd SSR/RSC 与客户端构建成功。
 - Web Worker 和 Jobs Worker `wrangler deploy --dry-run`：均成功，没有执行发布。
 - HTTP `/robots.txt` 与 `/sitemap.xml`：均返回 200，域名正确，账户/API 路径不列入 sitemap；私有页面设置 noindex。
 - 浏览器：从测试登录、充值、上传到任务完成、账本、历史、下载和退出。真实下载文件经 ffprobe 检查为 H.264 / 480 × 854 / 3.000 秒，只有视频流，无音乐轨道。
 - 设计稿联合图对比、桌面和 390 px 移动端截图；菜单与 FAQ 交互验证。见根目录 `design-qa.md` 与 `docs/screenshots/`。
+- GA4/Clarity 本地浏览器复核：开发页 `http://127.0.0.1:3100` 无监控引导、外部监控 script 或 preload；生产预览 `http://127.0.0.1:4173` 存在带正式 origin 检查的内联引导，但没有外部监控 script 或 preload。未通过正式域名制造测试流量。
 
 ## 验收发现并修复
 
@@ -33,6 +34,6 @@
 
 ## 尚未验证
 
-真实 Google 登录、Waffo sandbox 交易/退款与商户批准、WaveSpeed 21 秒/三分辨率/双角色一致性/收费行为、云端 D1/R2/Cron/域名、真实输入输出审核运营、支持邮箱与合法运营主体。所有真实开关默认关闭，详细配置见 `deployment.md`。
+真实 Google 登录、Waffo sandbox 交易/退款与商户批准、WaveSpeed 21 秒/三分辨率/双角色一致性/收费行为、云端 D1/R2/Cron/域名、GA4/Clarity 正式站上报与后台数据、真实输入输出审核运营、支持邮箱与合法运营主体。真实支付和生成开关默认关闭；监控按生产构建及正式 origin 自动启用，详细配置见 `deployment.md`。
 
 `llms.txt`：项目不存在该文件；本轮检查完成，未新建。

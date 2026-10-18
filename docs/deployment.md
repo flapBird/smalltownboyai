@@ -22,6 +22,12 @@ npm run jobs:deploy
 
 `npm run deploy` 先构建，再使用 Vinext 生成的 `dist/server/wrangler.json`，不是直接部署原始 TS 入口。Cron Worker 每分钟运行，不能只部署 Web Worker。部署前 `--dry-run` 验证打包不能替代账户上的远程验证。
 
+## GA4 与 Microsoft Clarity
+
+全站根布局已接入 GA4（`G-BC37LL57GH`）和 Clarity（`yzjg1z6gia`），无需额外密钥。只有 `NODE_ENV=production` 的构建会输出引导脚本，且浏览器当前 origin 必须精确等于 `https://smalltownboyai.one`，才异步加载这两个监控。外部监控脚本没有独立的 SSR script/preload 标签，域名检查在任何监控请求之前执行。
+
+`npm run dev`、`npm test`、`npm run build` 后的本地 `npm run preview`、localhost/IPv4/IPv6/局域网地址及其他预览域名均不会触发监控。正式域名下的测试流量会正常统计；本地联调保持使用本地地址。更换正式域名时须同步修改 `lib/analytics.ts` 的 origin 白名单、对应测试和隐私页说明。
+
 ## Google OAuth / Better Auth
 
 1. 在 Google Cloud 建 OAuth Web application，配置同意屏幕与测试用户。

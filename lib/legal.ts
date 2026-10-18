@@ -25,7 +25,7 @@ export const LEGAL: Record<
       ],
       [
         "Cookies and your choices",
-        "Session cookies support authentication. We do not currently install advertising or analytics trackers. You can sign out or clear browser site data to remove local session and draft information. Accounting and audit records may need retention when required by applicable law.",
+        "Session cookies support authentication. On our production site at https://smalltownboyai.one, Google Analytics 4 measures site visits and interactions, and Microsoft Clarity provides interaction analytics and session recordings to help improve usability. These services may use cookies and process device, browser and usage information under their own privacy policies. Analytics do not load during local development, local production previews or visits on other domains. You can use browser tracking controls and clear browser site data to remove cookies, local session and draft information. Accounting and audit records may need retention when required by applicable law.",
       ],
       [
         "Preview status",

@@ -32,6 +32,7 @@ npm run dev
 - 文件格式、尺寸、大小限制，所有权、短期签名访问、删除和孤立上传清理；上传/提交限速、最多 2 个活跃任务。
 - Dashboard 账单/视频/预览/下载/删除；后台用户、订单、账本、任务、成本、审核、补偿、暂停、人工退款/拒付对账与审计。
 - Privacy、Terms、Refund、Acceptable Use、Contact & report。举报通过支持邮箱；邮箱收件能力尚待用户配置。
+- GA4（`G-BC37LL57GH`）与 Microsoft Clarity（`yzjg1z6gia`）：仅生产构建且访问 `https://smalltownboyai.one` 时在页面交互就绪后加载；`npm run dev`、`npm test`、本地生产预览及其他域名不会加载监控脚本或发送数据。
 
 ## 结构与页面
 

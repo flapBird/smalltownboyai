@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { Analytics } from "@/components/analytics";
 import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://smalltownboyai.one"),
@@ -34,6 +35,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <Header />
         {children}
         <Footer />
+        <Analytics />
       </body>
     </html>
   );
