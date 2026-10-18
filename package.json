@@ -1,0 +1,59 @@
+{
+  "name": "smalltown-boy-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "check": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "wrangler d1 migrations apply smalltownboyai --local",
+    "deploy": "npm run build && wrangler deploy --config dist/server/wrangler.json",
+    "preview": "vite preview",
+    "mock:seed": "wrangler r2 object put smalltownboyai-private/fixtures/mock.mp4 --file public/fixtures/mock.mp4 --local",
+    "jobs:deploy": "wrangler deploy -c wrangler.jobs.jsonc",
+    "format": "prettier --write app components lib db/schema.ts tests *.ts *.json *.jsonc *.md docs/*.md"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "latest",
+    "@waffo/pancake-ts": "latest",
+    "better-auth": "latest",
+    "class-variance-authority": "latest",
+    "clsx": "latest",
+    "drizzle-orm": "latest",
+    "lucide-react": "latest",
+    "next": "^16.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-server-dom-webpack": "^19.2.0",
+    "tailwind-merge": "latest",
+    "vinext": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "latest",
+    "@cloudflare/workers-types": "latest",
+    "@tailwindcss/vite": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "@vitejs/plugin-rsc": "latest",
+    "drizzle-kit": "latest",
+    "miniflare": "latest",
+    "prettier": "^3.9.10",
+    "tailwindcss": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "vitest": "latest",
+    "wrangler": "latest"
+  },
+  "overrides": {
+    "fflate": "0.8.3",
+    "@esbuild-kit/core-utils": {
+      "esbuild": "0.25.12"
+    }
+  }
+}

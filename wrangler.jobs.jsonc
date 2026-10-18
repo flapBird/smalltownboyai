@@ -1,0 +1,19 @@
+{
+  "name": "smalltownboyai-jobs",
+  "main": "worker-jobs.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "triggers": { "crons": ["* * * * *"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "smalltownboyai",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+    },
+  ],
+  "r2_buckets": [
+    { "binding": "MEDIA", "bucket_name": "smalltownboyai-private" },
+  ],
+  "vars": { "APP_MODE": "production", "OUTPUT_HOSTS": "" },
+  "observability": { "enabled": true },
+}

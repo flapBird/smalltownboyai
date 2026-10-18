@@ -1,0 +1,1 @@
+ALTER TABLE `video_tasks` ADD `deleted_at` integer;

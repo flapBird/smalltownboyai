@@ -1,0 +1,25 @@
+# Copy to .dev.vars for localhost only. Mock endpoints ALSO require a loopback hostname.
+APP_ORIGIN=http://127.0.0.1:3000
+APP_MODE=mock
+GENERATION_ENABLED=false
+PAYMENTS_ENABLED=false
+WAFFO_ENVIRONMENT=test
+# Configure real Google OAuth only when testing real sign-in:
+BETTER_AUTH_SECRET=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+WAFFO_MERCHANT_ID=
+WAFFO_PRIVATE_KEY=
+WAFFO_PRODUCT_LITE=
+WAFFO_PRODUCT_STANDARD=
+WAFFO_PRODUCT_PRO=
+MERCHANT_APPROVED=false
+WAVESPEED_API_KEY=
+# Must be a licensed SILENT 21-second 9:16 reference MP4:
+REFERENCE_VIDEO_URL=
+REFERENCE_LICENSE_CONFIRMED=false
+# Enable only independently validated resolutions, e.g. 480p,720p:
+VERIFIED_RESOLUTIONS=
+MEDIA_SIGNING_SECRET=
+# Exact approved WaveSpeed output CDN hostnames, comma-separated. No wildcard:
+OUTPUT_HOSTS=
