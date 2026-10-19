@@ -99,16 +99,14 @@ p {
   gap: 5px;
   white-space: nowrap;
 }
-.brand span:not(.brand-dot) {
+.brand .brand-accent {
   color: var(--lime);
 }
-.brand-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--lime);
-  align-self: flex-start;
-  margin-top: 5px;
+.brand-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  margin-right: 5px;
 }
 .nav {
   display: flex;
@@ -1475,6 +1473,19 @@ td {
   .dashboard-tabs {
     font-size: 12px;
     gap: 20px;
+  }
+}
+@media (max-width: 420px) {
+  .site-header .brand-name {
+    max-width: 100px;
+    white-space: normal;
+    font-size: 16px;
+    line-height: 1.1;
+  }
+  .site-header .brand-icon {
+    width: 28px;
+    height: 28px;
+    margin-right: 3px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -5,6 +5,13 @@ import { Analytics } from "@/components/analytics";
 import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://smalltownboyai.one"),
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "16x16 32x32 48x48", type: "image/x-icon" },
+      { url: "/icon.svg", sizes: "any", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   title: {
     default: "Smalltown Boy AI Generator – Create Cat Dance Videos",
     template: "%s | Smalltown Boy AI",

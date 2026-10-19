@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import { Brand } from "@/components/brand";
 export function Footer() {
   return (
     <footer className="footer">
       <div className="footer-top">
         <div>
-          <Link className="brand" href="/">
-            Smalltown Boy <span>AI</span>
-          </Link>
+          <Brand />
           <p>A little mischief. A lot of personality.</p>
         </div>
         <a href="mailto:support@smalltownboyai.one">

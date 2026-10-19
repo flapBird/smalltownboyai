@@ -21,6 +21,7 @@
 - **模型与后台任务**：WaveSpeed provider adapter、持久化任务、定时查询、租约与结果归档；输入和输出人工审核，不自动重试结果不确定的付费提交。
 - **管理后台**：用户、订单、账本、任务、成本、审核、补偿、暂停与人工退款/拒付对账，保留操作审计。
 - **页面与 SEO**：响应式深色界面、FAQ、政策与联系页面；App Router SSR、Metadata、canonical、Open Graph、robots 与 sitemap，账户页面设置 noindex。
+- **品牌图标**：青柠绿与炭黑的猫咪播放键图标，统一用于导航与页脚；`public/icon.svg` 为矢量源文件，配套 512px PNG、16/32/48px favicon 和 180px Apple 触屏图标。
 - **访问分析**：GA4 与 Microsoft Clarity，仅在生产构建的正式域名下启用，本地开发和测试不触发监控。
 
 ## 技术栈

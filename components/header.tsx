@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Menu, X, ArrowUpRight, Coins } from "lucide-react";
+import { Brand } from "@/components/brand";
 export function Header() {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState<{
@@ -34,10 +35,7 @@ export function Header() {
   return (
     <header className="site-header">
       <div className="nav-wrap">
-        <Link href="/" className="brand">
-          Smalltown Boy <span>AI</span>
-          <span className="brand-dot" />
-        </Link>
+        <Brand />
         <nav aria-label="Main navigation" className={open ? "nav open" : "nav"}>
           {[
             ["Home", "/"],
