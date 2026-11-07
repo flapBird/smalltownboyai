@@ -2909,3 +2909,138 @@ td {
   left: 12px;
   font-size: 8px;
 }
+.product-intro {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 64px;
+  border-top: 1px solid var(--line);
+  padding: 64px 0;
+  scroll-margin-top: 90px;
+}
+.product-intro h2,
+.how-to h2 {
+  font-size: 36px;
+  line-height: 1.15;
+  letter-spacing: -1.2px;
+  margin: 16px 0 0;
+}
+.product-intro-copy p {
+  font-size: 16px;
+  line-height: 1.8;
+  margin: 0 0 18px;
+  color: #bfc6b8;
+}
+.product-intro-copy .intro-lead {
+  font-size: 24px;
+  color: var(--text);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.intro-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 25px 0;
+}
+.intro-facts span {
+  border: 1px solid #46513d;
+  border-radius: 24px;
+  padding: 7px 12px;
+  font-size: 12px;
+  color: #d4dfca;
+}
+.product-intro-copy .intro-availability {
+  font-size: 13px;
+  margin-bottom: 0;
+}
+.how-to {
+  padding: 56px 0 70px;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 90px;
+}
+.how-to-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 24px;
+  margin-bottom: 36px;
+}
+.how-to-heading > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  white-space: nowrap;
+}
+.how-to-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.how-to-steps li {
+  border-top: 1px solid #46513d;
+  padding-top: 24px;
+}
+.step-number {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--lime);
+}
+.how-to-steps h3 {
+  font-size: 19px;
+  margin: 18px 0 12px;
+}
+.how-to-steps p {
+  font-size: 14px;
+  line-height: 1.75;
+  color: #bfc6b8;
+  margin: 0;
+}
+.how-to-steps a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 13px;
+  color: var(--lime);
+  margin-top: 10px;
+}
+.how-to-note {
+  font-size: 12px;
+  color: #bfc6b8;
+  margin: 28px 0 0;
+  line-height: 1.7;
+}
+@media (max-width: 1000px) {
+  .how-to-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .product-intro {
+    gap: 32px;
+  }
+}
+@media (max-width: 700px) {
+  .product-intro {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 40px 0;
+  }
+  .product-intro h2,
+  .how-to h2 {
+    font-size: 30px;
+  }
+  .how-to {
+    padding: 40px 0;
+  }
+  .how-to-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .how-to-steps {
+    grid-template-columns: 1fr;
+    gap: 26px;
+  }
+}

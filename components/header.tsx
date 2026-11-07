@@ -41,7 +41,7 @@ export function Header() {
             ["Templates", "/#templates"],
             ["Create", "/#create"],
             ["Pricing", "/pricing"],
-            ["FAQ", "/#faq"],
+            ["How it works", "/#how-to"],
             ["My Videos", "/dashboard/videos"],
           ].map(([name, path]) => (
             <Link key={name} href={path} onClick={() => setOpen(false)}>
