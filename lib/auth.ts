@@ -2,9 +2,9 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { drizzle } from "drizzle-orm/d1";
 import * as schema from "@/db/schema";
-import { type Bindings, localMock } from "./env";
+import { type Bindings, localMock, googleConfigured } from "./env";
 export function auth(e: Bindings) {
-  if (!e.BETTER_AUTH_SECRET || !e.GOOGLE_CLIENT_ID || !e.GOOGLE_CLIENT_SECRET)
+  if (!googleConfigured(e))
     throw new Error("Google sign-in is not configured.");
   return betterAuth({
     database: drizzleAdapter(drizzle(e.DB, { schema }), {
@@ -12,12 +12,12 @@ export function auth(e: Bindings) {
       schema,
     }),
     baseURL: e.APP_ORIGIN,
-    secret: e.BETTER_AUTH_SECRET,
+    secret: e.BETTER_AUTH_SECRET!,
     trustedOrigins: [e.APP_ORIGIN],
     socialProviders: {
       google: {
-        clientId: e.GOOGLE_CLIENT_ID,
-        clientSecret: e.GOOGLE_CLIENT_SECRET,
+        clientId: e.GOOGLE_CLIENT_ID!,
+        clientSecret: e.GOOGLE_CLIENT_SECRET!,
       },
     },
     databaseHooks: {
@@ -57,7 +57,7 @@ export async function identity(
         .bind(token, Date.now())
         .first<Identity>();
   }
-  if (!e.BETTER_AUTH_SECRET || !e.GOOGLE_CLIENT_ID) return null;
+  if (!googleConfigured(e)) return null;
   const s = await auth(e).api.getSession({ headers: r.headers });
   if (!s) return null;
   return e.DB.prepare("SELECT id,name,email,image,role FROM user WHERE id=?")

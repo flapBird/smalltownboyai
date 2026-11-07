@@ -1,3 +1,4 @@
+import { HomeVideos } from "@/components/home-videos";
 import { Generator } from "@/components/generator";
 import { Pricing } from "@/components/pricing";
 import { FAQ } from "@/lib/catalog";
@@ -15,83 +16,9 @@ export default function Home() {
   return (
     <main id="main">
       <div className="home-container">
-        <section className="hero">
-          <div className="hero-eyebrow">
-            <span className="tiny-dot" /> A LITTLE DANCE. A LOT OF PERSONALITY.
-          </div>
-          <h1>
-            Smalltown Boy AI
-            <br />
-            Video Generator<span className="heading-dot">.</span>
-          </h1>
-          <div className="hero-bottom">
-            <p>
-              Turn your pet photos into a hilarious double act.
-              <br className="desktop-break" /> Two characters. One Smalltown
-              Boy-inspired dance.
-            </p>
-            <a href="#create" className="hero-anchor">
-              MEET YOUR NEXT DANCING DUO <ArrowDown size={17} />
-            </a>
-          </div>
-        </section>
+        <HomeVideos hero />
         <Generator />
-        <section id="examples" className="section examples">
-          <div className="section-heading-row">
-            <div>
-              <span className="eyebrow">THE IDEA BEHIND THE DANCE</span>
-              <h2>
-                Big personalities.
-                <br />
-                Tiny dancing shoes.
-              </h2>
-            </div>
-            <p>
-              One reacts. One steals the spotlight.
-              <br />
-              Together, they make the whole scene.
-              <br />
-              <span className="muted">
-                Concept images below, not generated video examples.
-              </span>
-            </p>
-          </div>
-          <div className="example-grid">
-            <figure>
-              <img
-                src="/images/character-a.png"
-                alt="AI-generated tabby cat concept portrait"
-                loading="lazy"
-              />
-              <figcaption>
-                <span>01 / THE REACTION</span>
-                <h3>A natural scene-stealer.</h3>
-              </figcaption>
-            </figure>
-            <figure>
-              <img
-                src="/images/dance-preview.png"
-                alt="Illustrative two-cat dance concept"
-                loading="lazy"
-              />
-              <figcaption>
-                <span>02 / THE DOUBLE ACT</span>
-                <h3>Better together.</h3>
-              </figcaption>
-            </figure>
-            <figure>
-              <img
-                src="/images/character-b.png"
-                alt="AI-generated blue-eyed cat concept portrait"
-                loading="lazy"
-              />
-              <figcaption>
-                <span>03 / THE PERSONALITY</span>
-                <h3>Unmistakably your pet.</h3>
-              </figcaption>
-            </figure>
-          </div>
-        </section>
+        <HomeVideos />
         <section className="section how">
           <div className="section-head">
             <span className="eyebrow">FROM CAMERA ROLL TO DANCE FLOOR</span>

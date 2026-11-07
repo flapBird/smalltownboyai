@@ -38,7 +38,7 @@ export function Header() {
         <Brand />
         <nav aria-label="Main navigation" className={open ? "nav open" : "nav"}>
           {[
-            ["Home", "/"],
+            ["Templates", "/#templates"],
             ["Create", "/#create"],
             ["Pricing", "/pricing"],
             ["FAQ", "/#faq"],

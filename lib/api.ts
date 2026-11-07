@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { auth, identity, requireUser, sameOrigin, AppError } from "./auth";
-import { type Bindings, localMock, liveResolutions } from "./env";
+import {
+  type Bindings,
+  localMock,
+  liveResolutions,
+  googleConfigured,
+} from "./env";
 import {
   reserveTask,
   settleTask,
@@ -117,9 +122,9 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
     const path = parts.join("/");
     const mock = localMock(e, r);
     if (parts[0] === "auth") {
-      if (!e.GOOGLE_CLIENT_ID || !e.BETTER_AUTH_SECRET)
+      if (!googleConfigured(e))
         return json({ error: "Google sign-in is not configured yet." }, 503);
-      return auth(e).handler(r);
+      return await auth(e).handler(r);
     }
     if (r.method === "POST" && path === "webhooks/waffo") {
       if (!e.WAFFO_MERCHANT_ID)
@@ -144,26 +149,25 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
         mock,
         generation: liveResolutions(e).length > 0,
         resolutions: liveResolutions(e),
-        templates: publicTemplates(e, mock),
-        google: !!(
-          e.GOOGLE_CLIENT_ID &&
-          e.GOOGLE_CLIENT_SECRET &&
-          e.BETTER_AUTH_SECRET
-        ),
+        templates: await publicTemplates(e, mock),
+        google: googleConfigured(e),
         payments: e.PAYMENTS_ENABLED === "true",
       });
     if (r.method === "GET" && parts[0] === "templates" && parts.length === 3) {
       const template = getTemplate(parts[1]);
       if (!template) throw new AppError(404, "Template not found.");
       if (parts[2] === "preview") {
-        if (mock)
+        if (
+          mock &&
+          (await e.MEDIA.head(template.objectKey))?.etag !== template.etag
+        )
           return await objectResponse(
             e,
             "fixtures/mock.mp4",
             false,
             r.headers.get("range"),
           );
-        if (e.REFERENCE_LICENSE_CONFIRMED !== "true")
+        if (!mock && e.REFERENCE_LICENSE_CONFIRMED !== "true")
           throw new AppError(404, "Preview unavailable.");
       } else if (parts[2] === "source") {
         if (

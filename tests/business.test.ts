@@ -855,3 +855,95 @@ describe("H3 templates, prices and private source access", () => {
     expect(await wallet(u.id)).toMatchObject({ balance: 400, reserved: 200 });
   });
 });
+
+describe("Google OAuth configuration and start flow", () => {
+  it("returns a clear unavailable state when any Google credential is missing", async () => {
+    const configured = {
+      ...e,
+      APP_MODE: "production",
+      BETTER_AUTH_SECRET: "test-only-secret-at-least-thirty-two-characters",
+      GOOGLE_CLIENT_ID: "test.apps.googleusercontent.com",
+      GOOGLE_CLIENT_SECRET: "test-only-google-secret",
+    };
+    for (const name of [
+      "BETTER_AUTH_SECRET",
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+    ] as const) {
+      const env = { ...configured, [name]: undefined };
+      const cfg = await handle(new Request("http://localhost/api/config"), env);
+      expect(await cfg.json()).toMatchObject({ google: false });
+      expect(
+        (await handle(new Request("http://localhost/api/me"), env)).status,
+      ).toBe(401);
+      const start = await handle(
+        new Request("http://localhost/api/auth/sign-in/social", {
+          method: "POST",
+          headers: {
+            origin: "http://localhost",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            provider: "google",
+            callbackURL: "http://localhost/",
+          }),
+        }),
+        env,
+      );
+      expect(start.status).toBe(503);
+    }
+  });
+  it("creates a real Better Auth Google authorization URL and handles cancellation", async () => {
+    const env = {
+      ...e,
+      APP_MODE: "production",
+      BETTER_AUTH_SECRET: "test-only-secret-at-least-thirty-two-characters",
+      GOOGLE_CLIENT_ID: "test.apps.googleusercontent.com",
+      GOOGLE_CLIENT_SECRET: "test-only-google-secret",
+    };
+    const r = await handle(
+      new Request("http://localhost/api/auth/sign-in/social", {
+        method: "POST",
+        headers: {
+          origin: "http://localhost",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          provider: "google",
+          callbackURL: "http://localhost/#create",
+          errorCallbackURL: "http://localhost/login?next=%2F%23create",
+        }),
+      }),
+      env,
+    );
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as { url: string };
+    const authorization = new URL(body.url);
+    expect(authorization.hostname).toBe("accounts.google.com");
+    expect(authorization.searchParams.get("client_id")).toBe(
+      env.GOOGLE_CLIENT_ID,
+    );
+    expect(authorization.searchParams.get("redirect_uri")).toBe(
+      "http://localhost/api/auth/callback/google",
+    );
+    expect(authorization.searchParams.get("scope")).toContain("openid");
+    expect(authorization.searchParams.get("state")).toBeTruthy();
+    const cookie = r.headers
+      .getSetCookie()
+      .map((v) => v.split(";")[0])
+      .join("; ");
+    const callback = new URL("http://localhost/api/auth/callback/google");
+    callback.searchParams.set(
+      "state",
+      authorization.searchParams.get("state")!,
+    );
+    callback.searchParams.set("error", "access_denied");
+    const cancelled = await handle(
+      new Request(callback, { headers: { cookie } }),
+      env,
+    );
+    expect(cancelled.status).toBe(302);
+    expect(cancelled.headers.get("location")).toContain("/login?");
+    expect(cancelled.headers.get("location")).toContain("error=access_denied");
+  });
+});

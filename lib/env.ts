@@ -24,6 +24,18 @@ export interface Bindings {
   MEDIA_SIGNING_SECRET?: string;
   OUTPUT_HOSTS?: string;
 }
+export function googleConfigured(
+  e: Pick<
+    Bindings,
+    "BETTER_AUTH_SECRET" | "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET"
+  >,
+) {
+  return !!(
+    e.BETTER_AUTH_SECRET?.trim() &&
+    e.GOOGLE_CLIENT_ID?.trim() &&
+    e.GOOGLE_CLIENT_SECRET?.trim()
+  );
+}
 export function bindings() {
   return env as unknown as Bindings;
 }

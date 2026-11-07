@@ -23,7 +23,12 @@ async function request(path: string, method = "GET", body?: unknown) {
       : {}),
   });
   const d: any = await r.json();
-  if (!r.ok) throw new Error(d.error);
+  if (!r.ok)
+    throw new Error(
+      typeof d.error === "string"
+        ? d.error
+        : d.message || "Something went wrong. Please try again.",
+    );
   return d;
 }
 export function Login() {
@@ -33,6 +38,10 @@ export function Login() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
+    if (new URLSearchParams(location.search).has("error"))
+      setError(
+        "Google sign-in didn’t finish. Please try again. Your photos are saved in this browser.",
+      );
     request("config")
       .then(setCfg)
       .catch(() => setError("Service is temporarily unavailable."));
@@ -53,6 +62,8 @@ export function Login() {
         const d = await request("auth/sign-in/social", "POST", {
           provider: "google",
           callbackURL: location.origin + next(),
+          errorCallbackURL:
+            location.origin + "/login?next=" + encodeURIComponent(next()),
         });
         if (d.url) location.href = d.url;
         else throw new Error("Google sign-in could not start.");
@@ -63,7 +74,10 @@ export function Login() {
     }
   }
   return (
-    <div className="login-box">
+    <div className="login-box studio-login">
+      <a href="/" className="login-brand">
+        <img src="/icon.svg" alt="Smalltown Boy AI" width={52} height={52} />
+      </a>
       <span className="eyebrow">WELCOME TO THE DANCE FLOOR</span>
       <h1 style={{ marginTop: 18 }}>Your duo awaits.</h1>
       <p>
@@ -75,11 +89,22 @@ export function Login() {
         disabled={busy || !cfg?.google}
         onClick={() => login(false)}
       >
-        Continue with Google <ArrowUpRight size={17} />
+        {busy ? (
+          <>
+            <Loader2 className="spin" size={17} />
+            Connecting…
+          </>
+        ) : (
+          <>
+            Continue with Google <ArrowUpRight size={17} />
+          </>
+        )}
       </Button>
       {cfg && !cfg.google && (
         <p className="status-note">
-          Google sign-in is not configured in this preview.
+          {cfg.mock
+            ? "Google sign-in isn’t connected locally yet. You can try the demo below."
+            : "Google sign-in is not available yet. Please check back soon."}
         </p>
       )}
       {cfg?.mock && (

@@ -2,17 +2,18 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Upload,
+  Plus,
+  Music2,
+  PawPrint,
   X,
   Sparkles,
   ArrowUpRight,
-  ImagePlus,
   ShieldCheck,
-  Play,
   Loader2,
   Download,
-  CircleCheck,
   AlertCircle,
 } from "lucide-react";
+import { TemplatePicker } from "./template-picker";
 import { Button } from "./ui/button";
 import { SPECS, type Resolution } from "@/lib/catalog";
 import type { PublicTemplate } from "@/lib/templates";
@@ -120,7 +121,17 @@ export function Generator() {
             c.templates[0]?.id ||
             "living-room",
         );
-        if (!c.mock && c.resolutions.length) setResolution(c.resolutions[0]);
+        const savedResolution = localStorage.getItem(
+          "smalltown-resolution",
+        ) as Resolution | null;
+        if (
+          savedResolution &&
+          Object.hasOwn(SPECS, savedResolution) &&
+          (c.mock || c.resolutions.includes(savedResolution))
+        )
+          setResolution(savedResolution);
+        else if (!c.mock && c.resolutions.length)
+          setResolution(c.resolutions[0]);
       })
       .catch(() => {});
     api("me")
@@ -282,334 +293,315 @@ export function Generator() {
     }
   }
   const active = task && !["completed", "failed"].includes(task.status);
+  useEffect(() => {
+    const select = (event: Event) => {
+      const id = (event as CustomEvent).detail;
+      if (!active && !busy && config.templates.some((t) => t.id === id)) {
+        setTemplateId(id);
+        localStorage.setItem("smalltown-template", id);
+        key.current = null;
+      }
+    };
+    window.addEventListener("smalltown-template-selected", select);
+    return () =>
+      window.removeEventListener("smalltown-template-selected", select);
+  }, [active, busy, config.templates]);
+  const selectedTemplate = config.templates.find((t) => t.id === templateId);
   return (
-    <section id="create" className="creator">
-      <div className="generator-panel">
-        <div className="step-title">
-          <span className="step-number">1</span>
-          <div>
-            <h2>Choose your dance</h2>
-            <p>Two scenes. One unforgettable double act.</p>
-          </div>
+    <section id="create" className="studio-create">
+      <div className="studio-heading">
+        <div>
+          <span className="studio-kicker">THE TWO-PHOTO DANCE STUDIO</span>
+          <h2>Meet your next dancing duo.</h2>
+          <p>One photo for each pet. We’ll take care of the moves.</p>
         </div>
-        <div className="template-grid" role="group" aria-label="Dance template">
-          {config.templates.map((t) => (
-            <div
-              key={t.id}
-              className={
-                "template-card " + (templateId === t.id ? "selected" : "")
-              }
-            >
-              {t.previewUrl ? (
-                <video
-                  key={t.previewUrl}
-                  src={t.previewUrl}
-                  controls
-                  muted
-                  playsInline
-                  preload="metadata"
-                  aria-label={`${t.name} ${config.mock ? "test animation" : "source template"}`}
-                />
-              ) : (
-                <div className="template-placeholder">
-                  <Play size={24} />
-                  <span>Preview coming soon</span>
+        <span className="studio-format">
+          14 SEC <span>/</span> 9:16
+        </span>
+      </div>
+      <div className="studio-workbench">
+        <div className="studio-upload-area">
+          <div className="studio-uploads">
+            {[0, 1].map((i) => (
+              <div className="pet-upload-card" key={i}>
+                <div className="pet-card-heading">
+                  <label htmlFor={"character-" + i}>
+                    <span>0{i + 1}</span> CHARACTER {i === 0 ? "A" : "B"}
+                  </label>
+                  <small>{i === 0 ? "Foreground" : "Background"}</small>
                 </div>
-              )}
-              <button
-                type="button"
-                aria-pressed={templateId === t.id}
-                disabled={!!busy || !!active}
-                onClick={() => {
-                  setTemplateId(t.id);
-                  localStorage.setItem("smalltown-template", t.id);
-                  key.current = null;
-                }}
-              >
-                <strong>{t.name}</strong>
-                <span>{t.description}</span>
-                <small>
-                  {config.mock
-                    ? "Demo preview · simulated output"
-                    : `14s · 9:16${t.available ? "" : " · Coming soon"}`}
-                </small>
-              </button>
+                <div
+                  className={"pet-dropzone " + (photos[i] ? "has-photo" : "")}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (!busy && !active) choose(i, e.dataTransfer.files[0]);
+                  }}
+                >
+                  {photos[i] ? (
+                    <>
+                      <img
+                        src={photos[i]!.url}
+                        alt={"Your character " + (i === 0 ? "A" : "B")}
+                      />
+                      <button
+                        type="button"
+                        className="pet-remove"
+                        aria-label={"Remove character " + (i === 0 ? "A" : "B")}
+                        disabled={!!busy || !!active}
+                        onClick={() => {
+                          setPhotos((p) =>
+                            p.map((v, n) => (n === i ? null : v)),
+                          );
+                          clearDraft(String(i));
+                          key.current = null;
+                        }}
+                      >
+                        <X size={17} />
+                      </button>
+                      <button
+                        type="button"
+                        className="pet-change"
+                        disabled={!!busy || !!active}
+                        onClick={() => inputs[i].current?.click()}
+                      >
+                        <Upload size={15} />
+                        Change photo
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="pet-upload-empty"
+                      disabled={!!busy || !!active}
+                      onClick={() => inputs[i].current?.click()}
+                    >
+                      <span className="upload-plus">
+                        <Plus size={25} />
+                      </span>
+                      <strong>Drop a photo here</strong>
+                      <span>or browse your files</span>
+                      <small>JPG, PNG or WebP · up to 8 MB</small>
+                    </button>
+                  )}
+                  <input
+                    id={"character-" + i}
+                    className="sr-only"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    ref={inputs[i]}
+                    disabled={!!busy || !!active}
+                    onChange={(e) => choose(i, e.target.files?.[0])}
+                  />
+                </div>
+                <p>
+                  {i === 0
+                    ? "The close-up. The big reaction."
+                    : "The moves. The scene-stealer."}
+                </p>
+              </div>
+            ))}
+            <div className="duo-sync" aria-hidden="true">
+              <Music2 size={21} />
             </div>
-          ))}
-        </div>
-        <p className="field-note">
-          A is the foreground character; B is the background character. Live
-          results keep the template audio.
-        </p>
-        <div className="generator-divider" />
-        <div className="step-title">
-          <span className="step-number">2</span>
-          <div>
-            <h2>Upload your two characters</h2>
-            <p>A great duo starts with two great photos.</p>
+          </div>
+          <div className="studio-upload-footer">
+            <span>
+              <ShieldCheck size={15} />
+              Your photos stay private.
+            </span>
+            <button
+              type="button"
+              onClick={samples}
+              disabled={!!busy || !!active}
+            >
+              Try sample photos <ArrowUpRight size={14} />
+            </button>
           </div>
         </div>
-        <div className="upload-grid">
-          {[0, 1].map((i) => (
-            <div className="upload-field" key={i}>
-              <label htmlFor={"character-" + i}>
-                Character {i === 0 ? "A" : "B"}
-              </label>
-              <div
-                className={"upload-box " + (photos[i] ? "has-photo" : "")}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  choose(i, e.dataTransfer.files[0]);
-                }}
-              >
-                {photos[i] ? (
-                  <>
-                    <img
-                      src={photos[i]!.url}
-                      alt={"Your character " + (i === 0 ? "A" : "B")}
-                    />
-                    <button
-                      className="remove-photo"
-                      aria-label={"Remove character " + (i === 0 ? "A" : "B")}
-                      onClick={() => {
-                        setPhotos((p) => p.map((v, n) => (n === i ? null : v)));
-                        clearDraft(String(i));
-                        key.current = null;
-                      }}
-                    >
-                      <X size={15} />
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    className="upload-empty"
-                    onClick={() => inputs[i].current?.click()}
-                  >
-                    <ImagePlus size={32} strokeWidth={1.3} />
-                    <span>Add your pet photo</span>
-                    <small>or drop it here</small>
-                  </button>
-                )}
-                <button
-                  className="upload-action"
-                  onClick={() => inputs[i].current?.click()}
-                >
-                  <Upload size={15} />
-                  {photos[i] ? "Change image" : "Upload image"}
-                </button>
-              </div>
-              <input
-                id={"character-" + i}
-                className="sr-only"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                ref={inputs[i]}
-                onChange={(e) => choose(i, e.target.files?.[0])}
-              />
-            </div>
-          ))}
-        </div>
-        <div className="upload-hint">
-          <span>JPG, PNG, WebP · Max 8 MB each</span>
-          <button onClick={samples} disabled={!!busy}>
-            Try sample photos <ArrowUpRight size={13} />
-          </button>
-        </div>
-        <div className="generator-divider" />
-        <div className="step-title settings-title">
-          <span className="step-number">3</span>
-          <h2>Make it your own</h2>
-        </div>
-        <div className="settings-grid">
-          <fieldset>
-            <legend>Resolution</legend>
-            <div className="resolution-options">
+        <aside className="studio-settings" aria-label="Video settings">
+          <TemplatePicker
+            templates={config.templates}
+            selectedId={templateId}
+            disabled={!!busy || !!active}
+            onSelect={(id) => {
+              setTemplateId(id);
+              localStorage.setItem("smalltown-template", id);
+              key.current = null;
+            }}
+          />
+          <fieldset className="studio-quality">
+            <legend className="studio-kicker">VIDEO QUALITY</legend>
+            <div className="quality-options">
               {(Object.keys(SPECS) as Resolution[]).map((r) => (
                 <button
                   type="button"
                   key={r}
-                  disabled={!config.mock && !config.resolutions.includes(r)}
-                  className={r === resolution ? "selected" : ""}
-                  aria-pressed={r === resolution}
+                  aria-pressed={resolution === r}
+                  disabled={
+                    !!busy ||
+                    !!active ||
+                    (!config.mock && !config.resolutions.includes(r))
+                  }
+                  className={resolution === r ? "selected" : ""}
                   onClick={() => {
                     setResolution(r);
+                    localStorage.setItem("smalltown-resolution", r);
                     key.current = null;
                   }}
                 >
-                  <span className="radio-indicator" />
-                  {r}
+                  <strong>{r}</strong>
+                  <span>{SPECS[r].credits} credits</span>
                 </button>
               ))}
             </div>
-            <p className="field-note">
-              {config.mock
-                ? "Test mode · simulated specifications"
-                : config.generation
-                  ? "14-second vertical MP4 · cleared template audio"
-                  : "Live generation is coming soon"}
-            </p>
           </fieldset>
-          <div className="credit-settings">
-            <div>
-              <span>Credits required</span>
-              <strong>
-                {SPECS[resolution].credits} <small>credits</small>
-              </strong>
-            </div>
-            <div>
-              <span>Current balance</span>
-              <strong>
-                {user ? user.wallet.balance : "—"}{" "}
-                <small>{user ? "credits" : "Sign in to view"}</small>
-              </strong>
-            </div>
+          <div className="studio-subject">
+            <span className="studio-kicker">CAST</span>
+            <span>
+              <PawPrint size={17} />
+              Pet duo
+            </span>
           </div>
-        </div>
-        <label className="consent">
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(e) => setConsent(e.target.checked)}
-          />
-          <span>
-            I own these images or have permission to use them. Pets and
-            fictional characters only.
-          </span>
-        </label>
-        <Button
-          className="generate-button"
-          onClick={generate}
-          disabled={!!busy || !!active}
-        >
-          {busy === "generate" ? (
-            <>
-              <Loader2 className="spin" size={18} />
-              Preparing your duo…
-            </>
-          ) : active ? (
-            <>
-              <Loader2 className="spin" size={18} />
-              Task {task.status}
-            </>
-          ) : (
-            <>
-              <Sparkles size={18} />
-              {!user
-                ? "Sign in to create your video"
-                : user.wallet.balance < SPECS[resolution].credits
-                  ? "Buy credits to create"
-                  : "Create Your AI Video"}
-              <ArrowUpRight size={17} />
-            </>
+          <div className="studio-cost">
+            <span>This video</span>
+            <strong>
+              {SPECS[resolution].credits} <small>credits</small>
+            </strong>
+          </div>
+          <div className="studio-balance">
+            <span>Your balance</span>
+            <span>
+              {user ? `${user.wallet.balance} credits` : "Sign in to view"}
+            </span>
+          </div>
+          <label className="studio-consent">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+            />
+            <span>
+              I own these photos or have permission to use them. Pets and
+              fictional nonhuman characters only.
+            </span>
+          </label>
+          <Button
+            className="studio-generate"
+            onClick={generate}
+            disabled={!!busy || !!active}
+          >
+            {busy === "generate" ? (
+              <>
+                <Loader2 className="spin" size={18} />
+                Preparing your duo…
+              </>
+            ) : active ? (
+              <>
+                <Loader2 className="spin" size={18} />
+                Task {task.status}
+              </>
+            ) : (
+              <>
+                <Sparkles size={18} />
+                {!user
+                  ? "Sign in to create your video"
+                  : user.wallet.balance < SPECS[resolution].credits
+                    ? "Buy credits to create"
+                    : "Create Your AI Video"}
+                <ArrowUpRight size={17} />
+              </>
+            )}
+          </Button>
+          <p className="studio-service-note">
+            {config.mock
+              ? "Local demo · no payment or AI call"
+              : config.generation && selectedTemplate?.available
+                ? "14-second MP4 · template audio included"
+                : "Live generation is coming soon."}
+          </p>
+          {message && (
+            <div className="error" role="alert">
+              <AlertCircle size={16} />
+              {message}
+            </div>
           )}
-        </Button>
-        <a href="#examples" className="watch-link">
-          <Play size={15} />
-          Watch Examples
-        </a>
-        <p className="security-note">
-          <ShieldCheck size={13} />
-          {config.mock
-            ? "Local demo · no real payment or AI call"
-            : "Private uploads. Made for pets, not people."}
-        </p>
-        {message && (
-          <div className="error" role="alert">
-            <AlertCircle size={16} />
-            {message}
-          </div>
-        )}
+        </aside>
       </div>
-      <div className="preview-column">
-        <div className="video-preview">
-          {task?.status === "completed" ? (
-            <video
-              controls
-              playsInline
-              src={"/api/tasks/" + task.id + "/video"}
-              poster="/images/dance-preview.png"
-            />
-          ) : (
-            <img
-              className="dance-image"
-              src="/images/dance-preview.png"
-              alt="Concept illustration of a tabby and a white cat dancing under warm streetlights"
-            />
-          )}
-          <span className="aspect-tag">9:16</span>
-          {!task && (
-            <div className="preview-bottom">
-              <span className="illustrative-label">
-                Illustrative preview · not a generated video
-              </span>
-              <div className="preview-caption">
-                <Sparkles size={16} />
-                <span>Two personalities. One dance floor.</span>
+      {task && (
+        <div className="studio-result" aria-live="polite">
+          <div className="studio-result-media">
+            {task.status === "completed" ? (
+              <video
+                controls
+                playsInline
+                src={"/api/tasks/" + task.id + "/video"}
+              />
+            ) : (
+              <div className="studio-progress">
+                <Loader2
+                  className={task.status === "failed" ? "" : "spin"}
+                  size={34}
+                />
+                <span>
+                  {task.status === "failed"
+                    ? "This one missed a beat"
+                    : task.status === "review"
+                      ? "Ready for review"
+                      : task.status === "unknown"
+                        ? "Checking your submission"
+                        : "Your duo is taking shape"}
+                </span>
               </div>
-            </div>
-          )}
-          {task && task.status !== "completed" && (
-            <div className="task-overlay">
-              <Loader2 className={task.status === "failed" ? "" : "spin"} />
-              <h3>
-                {task.status === "failed"
-                  ? "This one missed a beat"
-                  : task.status === "review"
-                    ? "Ready for review"
-                    : task.status === "unknown"
-                      ? "Checking your submission"
-                      : "Your duo is taking shape"}
-              </h3>
-              <p>
-                {task.status === "failed"
-                  ? "Reserved credits have been returned."
+            )}
+          </div>
+          <div>
+            <span className="studio-kicker">YOUR CREATION</span>
+            <h3>
+              {task.status === "completed"
+                ? "Ready for its close-up."
+                : "A little dance in the making."}
+            </h3>
+            <p>
+              {task.status === "failed"
+                ? "Reserved credits have been returned."
+                : task.status === "completed"
+                  ? config.mock
+                    ? "Test animation · 480 × 854 · 3 seconds"
+                    : "Your private video is ready to download."
                   : task.status === "review"
                     ? "Your video is awaiting content review."
-                    : "You can leave this page. Your task is saved in My Videos."}
-              </p>
-              <small>Task {task.id.slice(0, 8)}</small>
-            </div>
-          )}
-        </div>
-        {task?.status === "completed" ? (
-          <div className="result-info">
-            <p>
-              <CircleCheck size={16} />{" "}
-              {config.mock
-                ? "Test animation complete · 480 × 854 · 3s"
-                : "Video complete"}
-              {!config.mock ? " · " + task.resolution : ""}
+                    : "Your task is saved. You can check back in My Videos."}
             </p>
-            <a
-              className="button button-outline"
-              href={"/api/tasks/" + task.id + "/video?download=1"}
-            >
-              <Download size={16} />
-              Download {config.mock ? "test MP4" : "MP4"}
-            </a>
-            <button
-              className="text-link"
-              onClick={() => {
-                setTask(null);
-                key.current = null;
-                localStorage.removeItem("smalltown-task");
-              }}
-            >
-              Create another video
-            </button>
+            <small>
+              Task {task.id.slice(0, 8)} · {task.resolution}
+              {config.mock ? " requested" : ""}
+            </small>
+            {task.status === "completed" && (
+              <a
+                className="button button-primary"
+                href={"/api/tasks/" + task.id + "/video?download=1"}
+              >
+                <Download size={17} />
+                Download {config.mock ? "test MP4" : "MP4"}
+              </a>
+            )}
+            {["completed", "failed"].includes(task.status) && (
+              <button
+                type="button"
+                className="text-link"
+                onClick={() => {
+                  setTask(null);
+                  key.current = null;
+                  localStorage.removeItem("smalltown-task");
+                }}
+              >
+                Create another video <ArrowUpRight size={15} />
+              </button>
+            )}
           </div>
-        ) : (
-          <p className="preview-note">
-            <span className="tiny-dot" />A preview of the idea. Your pets bring
-            the personality.
-          </p>
-        )}
-        <div className="preview-meta">
-          <span>ONE PHOTO PER CHARACTER</span>
-          <span>MADE FOR VERTICAL VIDEO</span>
         </div>
-      </div>
+      )}
     </section>
   );
 }

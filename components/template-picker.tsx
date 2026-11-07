@@ -1,0 +1,167 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import { Check, X, ArrowUpRight, Film } from "lucide-react";
+import type { PublicTemplate } from "@/lib/templates";
+import { PreviewVideo } from "./preview-video";
+
+export function TemplatePicker({
+  templates,
+  selectedId,
+  onSelect,
+  disabled,
+}: {
+  templates: PublicTemplate[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  disabled?: boolean;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState(false);
+  const [candidate, setCandidate] = useState(selectedId);
+  const selected = templates.find((t) => t.id === selectedId);
+  const preview = templates.find((t) => t.id === candidate) || selected;
+  useEffect(() => {
+    if (open) {
+      dialog.current?.showModal();
+      const before = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        dialog.current?.close();
+        document.body.style.overflow = before;
+      };
+    }
+  }, [open]);
+  const thumbnail = (t?: PublicTemplate) =>
+    t?.previewUrl ? (
+      <video
+        src={t.previewUrl + "#t=0.1"}
+        muted
+        playsInline
+        preload="metadata"
+        aria-hidden="true"
+      />
+    ) : (
+      <Film size={26} />
+    );
+  return (
+    <>
+      <button
+        type="button"
+        className="template-switch"
+        disabled={disabled || !selected}
+        aria-haspopup="dialog"
+        onClick={() => {
+          setCandidate(selectedId);
+          setOpen(true);
+        }}
+      >
+        <span className="template-thumb">{thumbnail(selected)}</span>
+        <span>
+          <small>DANCE TEMPLATE</small>
+          <strong>{selected?.name || "Loading templates…"}</strong>
+          <em>
+            Change template <ArrowUpRight size={13} />
+          </em>
+        </span>
+        <span className="template-count">02</span>
+      </button>
+      <dialog
+        ref={dialog}
+        className="template-dialog"
+        aria-labelledby="template-dialog-title"
+        onCancel={() => setOpen(false)}
+        onClose={() => setOpen(false)}
+        onClick={(event) => {
+          if (event.target === dialog.current) {
+            const box = dialog.current.getBoundingClientRect();
+            if (
+              event.clientX < box.left ||
+              event.clientX > box.right ||
+              event.clientY < box.top ||
+              event.clientY > box.bottom
+            )
+              setOpen(false);
+          }
+        }}
+      >
+        {open && (
+          <div className="template-dialog-inner">
+            <header>
+              <div>
+                <span className="studio-kicker">PICK YOUR STAGE</span>
+                <h2 id="template-dialog-title">Find your duo’s scene.</h2>
+                <p>Preview the dance, then make it theirs.</p>
+              </div>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Close template picker"
+                onClick={() => setOpen(false)}
+              >
+                <X size={22} />
+              </button>
+            </header>
+            <div className="template-dialog-body">
+              <div className="template-dialog-preview">
+                <PreviewVideo
+                  key={preview?.id}
+                  src={preview?.previewUrl}
+                  label={preview?.name || "Dance template"}
+                  badge={
+                    preview?.previewKind === "demo"
+                      ? "LOCAL TEST CLIP"
+                      : "SOURCE TEMPLATE"
+                  }
+                />
+                <h3>{preview?.name}</h3>
+                <p>
+                  {preview?.description} Choose a photo for the foreground pet
+                  and another for the background pet.
+                </p>
+              </div>
+              <div className="template-dialog-options">
+                <span className="studio-kicker">
+                  SELECT A TEMPLATE ({templates.length})
+                </span>
+                {templates.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={
+                      candidate === t.id
+                        ? "template-option selected"
+                        : "template-option"
+                    }
+                    aria-pressed={candidate === t.id}
+                    onClick={() => setCandidate(t.id)}
+                  >
+                    <span className="template-thumb">{thumbnail(t)}</span>
+                    <span>
+                      <strong>{t.name}</strong>
+                      <small>{t.duration} seconds · two pets</small>
+                    </span>
+                    {candidate === t.id && <Check size={18} />}
+                  </button>
+                ))}
+                <p className="template-source-note">
+                  These are source templates, not examples generated by this
+                  site.
+                </p>
+                <button
+                  type="button"
+                  className="button button-primary template-apply"
+                  onClick={() => {
+                    onSelect(candidate);
+                    setOpen(false);
+                  }}
+                >
+                  Use this template <Check size={17} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </dialog>
+    </>
+  );
+}

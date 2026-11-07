@@ -30,6 +30,7 @@ export type PublicTemplate = Pick<
 > & {
   available: boolean;
   previewUrl: string | null;
+  previewKind: "template" | "demo" | "unavailable";
 };
 export function getTemplate(id: string) {
   return TEMPLATES.find((t) => t.id === id);
@@ -38,20 +39,37 @@ export function verifiedTemplates(e: Pick<Bindings, "VERIFIED_TEMPLATES">) {
   const ids = (e.VERIFIED_TEMPLATES || "").split(",").map((id) => id.trim());
   return TEMPLATES.filter((t) => ids.includes(t.id));
 }
-export function publicTemplates(e: Bindings, mock: boolean): PublicTemplate[] {
+export async function publicTemplates(
+  e: Bindings,
+  mock: boolean,
+): Promise<PublicTemplate[]> {
   const verified = verifiedTemplates(e);
-  return TEMPLATES.map(({ id, version, name, description, duration }) => ({
-    id,
-    version,
-    name,
-    description,
-    duration,
-    available: mock || verified.some((t) => t.id === id),
-    previewUrl:
-      mock || e.REFERENCE_LICENSE_CONFIRMED === "true"
-        ? `/api/templates/${id}/preview`
-        : null,
-  }));
+  return Promise.all(
+    TEMPLATES.map(async (t) => {
+      const { id, version, name, description, duration } = t;
+      const localSource = mock ? await e.MEDIA.head(t.objectKey) : null;
+      const previewKind = mock
+        ? localSource?.etag === t.etag
+          ? "template"
+          : "demo"
+        : e.REFERENCE_LICENSE_CONFIRMED === "true"
+          ? "template"
+          : "unavailable";
+      return {
+        id,
+        version,
+        name,
+        description,
+        duration,
+        previewKind,
+        available: mock || verified.some((t) => t.id === id),
+        previewUrl:
+          mock || e.REFERENCE_LICENSE_CONFIRMED === "true"
+            ? `/api/templates/${id}/preview`
+            : null,
+      };
+    }),
+  );
 }
 function scope(t: DanceTemplate) {
   return `template:${t.id}:${t.version}:${t.etag}`;

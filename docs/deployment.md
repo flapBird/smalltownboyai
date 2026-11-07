@@ -32,6 +32,8 @@ npm run jobs:deploy
 
 ## Google OAuth / Better Auth
 
+逐字段填写值、本地配置与排错见 [Google OAuth 配置指南](google-oauth.md)。本站使用 Better Auth + D1，无需 Supabase。2026-11-07 只读检查发现 Web Worker 尚无登录 Secrets，正式域名尚未绑定到 Worker；真实登录仍未验收。
+
 1. 在 Google Cloud 建 OAuth Web application，配置同意屏幕与测试用户。
 2. Authorized JavaScript origin 为站点 origin；redirect URI 为 `https://smalltownboyai.one/api/auth/callback/google`。本地联调需另加与 `APP_ORIGIN` 完全一致的回调。
 3. Web Worker 设置 `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET` 和强随机 `BETTER_AUTH_SECRET`。开发时放 `.dev.vars`，线上用 `wrangler secret put`，不要写前端环境变量。
@@ -70,14 +72,14 @@ Web Worker 需要 `WAFFO_MERCHANT_ID`、`WAFFO_PRIVATE_KEY`、`WAFFO_PRODUCT_LIT
 2. 用 5 秒裁剪片 + 两张宠物图先测 H3 480p，再逐一测试两套 14 秒模板和准备开放的画质。记录实际账单、失败收费、耗时、尺寸、双角色稳定性与声音。测试会消耗 WaveSpeed 额度。
 3. 按下节配置凭据与开关；在受控测试环境开放已验证模板/画质，跑通登录 → 选模板 → 上传 → 输入审核 → 生成 → Jobs 回收 → 私有 R2 → 输出审核 → 下载/历史/账本。验证失败释放、unknown 人工处理、签名到期、未验证模板和重复提交。
 4. 应用远程迁移后发布 Web / Jobs；配置正式域名、Google OAuth、管理员、支持邮箱、运营主体和政策，检查 Cron 实际执行及输出域名白名单。
-5. 完成 Waffo sandbox 付款、重发、退款与正式商户配置，确认新商品金额，再开放收款。使用审核通过的真实成片替换首页概念图，示例放 `examples/` 并单独提供受控公开读取；用户上传和私人结果保持私有。
+5. 完成 Waffo sandbox 付款、重发、退款与正式商户配置，确认新商品金额，再开放收款。首页现为明确标注的源模板视频预览；后续用审核通过的真实成片补充生成样例，示例放 `examples/` 并单独提供受控公开读取；用户上传和私人结果保持私有。
 6. 默认有声已由模板音轨保留实现；**无声文件下载和后期配乐尚未实现**，播放器静音不会改变下载的文件。若需要额外无声导出，另行实现处理链路。
 
 ## WaveSpeed 与参考视频配置
 
 Web Worker 需要 `WAVESPEED_API_KEY`、`MEDIA_SIGNING_SECRET`，不再读取 `REFERENCE_VIDEO_URL`。R2 保持私有，不开启整个桶的公开访问。
 
-- `REFERENCE_LICENSE_CONFIRMED=true`：在确认两套白名单模板的画面与配乐可使用后设置。**此配置也会开放两套模板的 `/api/templates/:id/preview` 预览接口**，只返回白名单源片，不允许任意 R2 对象键。未确认时前端显示预览待开放；本地 Mock 使用明确标注的 3 秒测试动画。
+- `REFERENCE_LICENSE_CONFIRMED=true`：在确认两套白名单模板的画面与配乐可使用后设置。**此配置也会开放两套模板的 `/api/templates/:id/preview` 预览接口**，只返回白名单源片，不允许任意 R2 对象键。未确认时前端显示预览待开放；本地 Mock 若存在 ETag 匹配的本地模板则预览源片；否则使用明确标注的 3 秒测试动画。
 - `VERIFIED_TEMPLATES=living-room,red-fence`：只填已通过真实测试的模板 ID，可先仅启用一套。任务提交、签名源访问均检查该白名单。修改模板文件会导致 ETag 不匹配并阻止使用；换素材应使用新对象键、更新模板版本及 ETag、重新验证，不要覆盖已发布版本。
 - `VERIFIED_RESOLUTIONS=480p,768p,1080p`：只填已验证规格，旧值 `720p` 会被忽略。支持能力不代表三档都已通过测试。
 - `GENERATION_ENABLED=true`：只有凭据、许可、模板和画质配置齐全才可提交真实请求；本轮保持关闭。供应商必须能通过站点域名访问短期签名链接，Cloudflare 后台地址不能当作视频 URL。实测排队取件时间应在签名期限内。

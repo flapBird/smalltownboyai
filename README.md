@@ -12,11 +12,11 @@
 
 已接入 H3 Video Edit、14 秒、客厅/红围栏双模板选择及私有 R2 模板签名读取。当前开放候选画质为 480p / 768p / 1080p；真实模型效果和生产链路仍待验证，生成开关保持关闭。最新状态与待办见 [执行清单](docs/deployment.md#最新执行清单)。
 
-真实支付与 AI 生成默认关闭；Google OAuth、Waffo、WaveSpeed、Cloudflare 资源及授权参考视频仍需配置和联调。首页使用明确标注的 AI 概念图；本地 Mock 输出为 480 × 854、3 秒、无音轨的 H.264 测试视频。
+真实支付与 AI 生成默认关闭；Google OAuth、Waffo、WaveSpeed、Cloudflare 资源及授权参考视频仍需配置和联调。首页与模板选择器使用可播放的源模板预览，明确区分模板与本站生成样例；本地 Mock 输出为 480 × 854、3 秒、无音轨的 H.264 测试视频。
 
 ## 功能
 
-- **上传与生成**：选择舞蹈模板、上传两个角色的图片，选择分辨率、确认素材使用权限；支持图片格式、尺寸及大小检查，本机 IndexedDB 保存草稿并在登录回跳后恢复。
+- **上传与生成**：并排双图上传、右侧画质与积分设置、弹窗预览选择舞蹈模板，选择分辨率、确认素材使用权限；支持图片格式、尺寸及大小检查，本机 IndexedDB 保存照片草稿，模板和画质在登录回跳后恢复。
 - **任务与视频**：任务状态轮询、视频预览与下载、历史列表和删除；私有 R2 存储、所有权检查及短期签名访问。
 - **账户与积分**：Better Auth Google 登录适配、会话与角色管理；新账户初始为 0 积分，积分冻结、消费与释放通过 D1 原子事务和不可变账本处理。
 - **套餐与支付**：Lite $4.90 / 100 积分、Standard $12.90 / 300 积分、Pro $24.90 / 600 积分；480p / 768p / 1080p 每次分别消耗 100 / 200 / 400 积分。集成 Waffo SDK checkout、RSA 验签、支付幂等及全额退款对账，真实可用规格以验证配置为准。
@@ -107,7 +107,7 @@ npx wrangler deploy --config dist/server/wrangler.json --dry-run
 npx wrangler deploy --config wrangler.jobs.jsonc --dry-run
 ```
 
-当前验证记录包含 52 项通过的测试，以及类型检查、Vinext 兼容性、生产构建和两个 Worker 的部署预检。`--dry-run` 不执行发布，也不能替代云端验收。使用 `npm run preview` 可在本地预览生产构建。
+当前验证记录包含 54 项通过的测试，以及类型检查、Vinext 兼容性、生产构建和两个 Worker 的部署预检。`--dry-run` 不执行发布，也不能替代云端验收。使用 `npm run preview` 可在本地预览生产构建。
 
 `npm run db:generate` 用于检查 Drizzle 模型差异；自定义触发器位于独立 SQL 迁移中，使用 Wrangler 按顺序应用，不使用 `drizzle-kit push` 绕过迁移。迁移 SQL 与 Drizzle journal 均需保留。
 
@@ -143,6 +143,7 @@ npx wrangler deploy --config wrangler.jobs.jsonc --dry-run
 ## 相关文档
 
 - [配置与部署](docs/deployment.md)
+- [Google OAuth 控制台逐项配置](docs/google-oauth.md)
 - [H3 成本与定价](docs/pricing.md)
 - [需求纠错](docs/requirements-review.md)
 - [验证记录与已知限制](docs/verification.md)
