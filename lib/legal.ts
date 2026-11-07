@@ -52,7 +52,7 @@ export const LEGAL: Record<
       ],
       [
         "AI and music",
-        "Concept images are AI-generated. The planned base model is WaveSpeed’s Seedance 2.5 Video Edit, subject to validation. Music rights are not included. This independent project is not affiliated with the original song or its artists.",
+        "Concept images are AI-generated. The model integration uses WaveSpeed’s MiniMax H3 Video Edit, subject to live validation. Results preserve cleared template audio; no separate music rights are granted. This independent project is not affiliated with the original song or its artists.",
       ],
       [
         "Availability and launch",

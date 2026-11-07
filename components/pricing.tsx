@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Check, ArrowUpRight, Loader2 } from "lucide-react";
-import { PACKAGES } from "@/lib/catalog";
+import { PACKAGES, SPECS, type Resolution } from "@/lib/catalog";
 import { Button } from "./ui/button";
 export function Pricing({
   mock: initialMock = false,
@@ -79,6 +79,14 @@ export function Pricing({
             <ul>
               <li>
                 <Check size={16} />
+                {p.id === "lite"
+                  ? "1 × 480p video"
+                  : p.id === "standard"
+                    ? "3 × 480p or 1 × 768p + 1 × 480p"
+                    : "6 × 480p, 3 × 768p or 1 × 1080p + 1 × 768p"}
+              </li>
+              <li>
+                <Check size={16} />
                 Up to {p.resolution} resolution
               </li>
               <li>
@@ -121,8 +129,12 @@ export function Pricing({
         </p>
       )}
       <p className="pricing-note">
-        Per video: 480p · 100 credits &nbsp; / &nbsp; 720p · 200 credits &nbsp;
-        / &nbsp; 1080p · 500 credits
+        Per 14-second video:{" "}
+        {(Object.entries(SPECS) as [Resolution, (typeof SPECS)[Resolution]][])
+          .map(
+            ([resolution, spec]) => `${resolution} · ${spec.credits} credits`,
+          )
+          .join(" / ")}
         <br />
         *Higher packs unlock higher resolutions. Refunds and chargebacks can
         affect access. Final video specifications require live validation.

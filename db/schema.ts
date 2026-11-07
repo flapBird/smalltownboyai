@@ -142,6 +142,8 @@ export const tasks = sqliteTable(
     provider: text("provider").notNull(),
     model: text("model").notNull(),
     providerTaskId: text("provider_task_id").unique(),
+    templateId: text("template_id"),
+    templateVersion: integer("template_version"),
     inputDuration: real("input_duration").notNull(),
     outputDuration: real("output_duration"),
     estimatedCost: integer("estimated_cost").notNull(),

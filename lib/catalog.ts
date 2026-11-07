@@ -7,7 +7,7 @@ export const PACKAGES = [
   {
     id: "lite",
     name: "Lite",
-    cents: 890,
+    cents: 490,
     credits: 100,
     tier: 1,
     resolution: "480p",
@@ -16,16 +16,16 @@ export const PACKAGES = [
   {
     id: "standard",
     name: "Standard",
-    cents: 1690,
-    credits: 200,
+    cents: 1290,
+    credits: 300,
     tier: 2,
-    resolution: "720p",
+    resolution: "768p",
     description: "Give your favorite duo their moment.",
   },
   {
     id: "pro",
     name: "Pro",
-    cents: 4990,
+    cents: 2490,
     credits: 600,
     tier: 3,
     resolution: "1080p",
@@ -33,9 +33,9 @@ export const PACKAGES = [
   },
 ] as const;
 export const SPECS = {
-  "480p": { credits: 100, tier: 1, rate: 0.11 },
-  "720p": { credits: 200, tier: 2, rate: 0.22 },
-  "1080p": { credits: 500, tier: 3, rate: 0.55 },
+  "480p": { credits: 100, tier: 1, rate: 0.05 },
+  "768p": { credits: 200, tier: 2, rate: 0.1 },
+  "1080p": { credits: 400, tier: 3, rate: 0.2 },
 } as const;
 export type Resolution = keyof typeof SPECS;
 export const TIER_NAMES = ["Free", "Lite", "Standard", "Pro"];
@@ -46,7 +46,7 @@ export const FAQ = [
   ],
   [
     "How do I make a Smalltown Boy AI video?",
-    "Choose two clear pet photos, one per character. Select a supported resolution, sign in with Google and review the credit cost before generating. In this local preview, you can explore the full flow with test credits without paying.",
+    "Choose a dance template and two clear pet photos, one per character. Select a supported resolution, sign in with Google and review the credit cost before generating. In this local preview, you can explore the full flow with test credits without paying.",
   ],
   [
     "Can I use my own cat or other pet photos?",
@@ -54,11 +54,11 @@ export const FAQ = [
   ],
   [
     "How long is the video, and which resolutions are supported?",
-    "Our target is a 21-second vertical MP4 in 480p, 720p or 1080p. Final availability depends on a licensed reference clip and real API validation. These specifications are not yet offered as a live service.",
+    "Our target is a 14-second vertical MP4 in 480p, 768p or 1080p. Final availability depends on a licensed reference clip and real API validation. These specifications are not yet offered as a live service.",
   ],
   [
     "How many credits will a video cost?",
-    "Planned costs are 100 credits for 480p, 200 for 720p and 500 for 1080p. Credits do not expire. Resolution access depends on your highest eligible purchase, separately from your current balance.",
+    "Planned costs are 100 credits for 480p, 200 for 768p and 400 for 1080p. Credits do not expire. Resolution access depends on your highest eligible purchase, separately from your current balance.",
   ],
   [
     "How long does generation take?",
@@ -66,7 +66,7 @@ export const FAQ = [
   ],
   [
     "Can I download the result, and is music included?",
-    "Completed videos are intended to be downloadable as private MP4 files. The local preview provides a clearly marked test animation. No commercial soundtrack is included or licensed by this service.",
+    "Completed videos are intended to be downloadable as private MP4 files. The local preview provides a clearly marked test animation. Live results preserve the selected template’s cleared audio. The original song is not promised; no separate music rights are granted.",
   ],
   [
     "What happens if generation fails?",

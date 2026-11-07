@@ -1,4 +1,11 @@
 import { SPECS, type Resolution } from "../catalog";
+export const H3_MODEL = "wavespeed-ai/minimax-h3/video-edit";
+export function estimateCost(inputDuration: number, resolution: Resolution) {
+  // Input rounds up; output is explicitly set to the same integer duration. Two images.
+  return Math.round(
+    (Math.ceil(inputDuration) * 2 * SPECS[resolution].rate + 0.04) * 100,
+  );
+}
 export interface GenerationInput {
   video: string;
   images: [string, string];
@@ -24,19 +31,25 @@ export class WaveSpeed implements VideoGenerationProvider {
     private transport: typeof fetch = fetch,
   ) {}
   validateInput(i: GenerationInput) {
-    if (i.inputDuration < 4 || i.inputDuration > 30 || !SPECS[i.resolution])
+    if (
+      !Number.isInteger(i.inputDuration) ||
+      i.inputDuration < 3 ||
+      i.inputDuration > 15 ||
+      !SPECS[i.resolution]
+    )
       throw new Error("Unsupported video specification.");
     for (const u of [i.video, ...i.images])
       if (new URL(u).protocol !== "https:")
         throw new Error("Provider media must use HTTPS.");
   }
   calculateCost(i: GenerationInput) {
-    return Math.round(i.inputDuration * 2 * SPECS[i.resolution].rate * 100);
+    this.validateInput(i);
+    return estimateCost(i.inputDuration, i.resolution);
   }
   async submitTask(i: GenerationInput) {
     this.validateInput(i);
     const r = await this.transport(
-      "https://api.wavespeed.ai/api/v3/bytedance/seedance-2.5/video-edit",
+      "https://api.wavespeed.ai/api/v3/" + H3_MODEL,
       {
         method: "POST",
         headers: {
@@ -48,9 +61,11 @@ export class WaveSpeed implements VideoGenerationProvider {
           video: i.video,
           reference_images: i.images,
           resolution: i.resolution,
+          duration: i.inputDuration,
+          aspect_ratio: "9:16",
           generate_audio: false,
           prompt:
-            "Replace the foreground character with the pet in @Image 1 and the background character with the pet in @Image 2. Preserve each pet identity, the original camera rhythm, exaggerated reaction, background dance, playful interaction and final two-character dance. Nonhuman pets only. Do not add text or music.",
+            "Replace the foreground character with the pet in the first reference image and the background character with the pet in the second reference image. Preserve each pet identity, the original camera rhythm, exaggerated reaction, background dance, playful interaction and final two-character dance. Nonhuman pets only. Preserve the source audio and its timing. Do not add text.",
         }),
       },
     );

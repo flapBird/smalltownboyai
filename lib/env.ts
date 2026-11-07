@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { verifiedTemplates } from "./templates";
 export interface Bindings {
   DB: D1Database;
   MEDIA: R2Bucket;
@@ -17,7 +18,7 @@ export interface Bindings {
   WAFFO_PRODUCT_STANDARD?: string;
   WAFFO_PRODUCT_PRO?: string;
   MERCHANT_APPROVED?: string;
-  REFERENCE_VIDEO_URL?: string;
+  VERIFIED_TEMPLATES?: string;
   REFERENCE_LICENSE_CONFIRMED?: string;
   VERIFIED_RESOLUTIONS?: string;
   MEDIA_SIGNING_SECRET?: string;
@@ -38,12 +39,12 @@ export function liveResolutions(e: Bindings): string[] {
     e.GENERATION_ENABLED !== "true" ||
     !e.WAVESPEED_API_KEY ||
     !e.MEDIA_SIGNING_SECRET ||
-    !e.REFERENCE_VIDEO_URL ||
+    !verifiedTemplates(e).length ||
     e.REFERENCE_LICENSE_CONFIRMED !== "true"
   )
     return [];
   return (e.VERIFIED_RESOLUTIONS || "")
     .split(",")
     .map((s) => s.trim())
-    .filter((s) => ["480p", "720p", "1080p"].includes(s));
+    .filter((s) => ["480p", "768p", "1080p"].includes(s));
 }

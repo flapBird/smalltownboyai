@@ -1,5 +1,7 @@
 import { SPECS, type Resolution } from "./catalog";
 import { AppError } from "./auth";
+import { H3_MODEL, estimateCost } from "./providers/wavespeed";
+import { getTemplate } from "./templates";
 export interface TaskRow {
   id: string;
   user_id: string;
@@ -12,6 +14,8 @@ export interface TaskRow {
   provider: string;
   model: string;
   provider_task_id: string | null;
+  template_id: string | null;
+  template_version: number | null;
   input_duration: number;
   output_duration: number | null;
   estimated_cost: number;
@@ -31,6 +35,7 @@ export async function reserveTask(
     assetA: string;
     assetB: string;
     resolution: Resolution;
+    templateId: string;
   },
   mock: boolean,
 ) {
@@ -44,11 +49,14 @@ export async function reserveTask(
     if (
       existing.asset_a !== input.assetA ||
       existing.asset_b !== input.assetB ||
-      existing.resolution !== input.resolution
+      existing.resolution !== input.resolution ||
+      existing.template_id !== input.templateId
     )
       throw new AppError(409, "This request key belongs to a different task.");
     return { task: existing, created: false };
   }
+  const template = getTemplate(input.templateId);
+  if (!template) throw new AppError(400, "Unknown dance template.");
   const spec = SPECS[input.resolution];
   if (!spec) throw new AppError(400, "Unsupported resolution.");
   const id = crypto.randomUUID(),
@@ -56,8 +64,8 @@ export async function reserveTask(
   await db.batch([
     db
       .prepare(
-        `INSERT OR IGNORE INTO video_tasks (id,user_id,request_key,status,resolution,credits,asset_a,asset_b,provider,model,input_duration,estimated_cost,created_at,updated_at)
- SELECT ?,?,?,'queued',?,?,?,?,?,?,21,?,?,? FROM user_wallets w WHERE w.user_id=? AND w.balance>=? AND w.tier>=?
+        `INSERT OR IGNORE INTO video_tasks (id,user_id,request_key,status,resolution,credits,asset_a,asset_b,provider,model,template_id,template_version,input_duration,estimated_cost,created_at,updated_at)
+ SELECT ?,?,?,'queued',?,?,?,?,?,?,?,?,?,?,?,? FROM user_wallets w WHERE w.user_id=? AND w.balance>=? AND w.tier>=?
  AND (SELECT COUNT(*) FROM video_tasks WHERE user_id=? AND status NOT IN ('completed','failed'))<2
  AND (SELECT value FROM settings WHERE key='generation_paused')='false'
  AND EXISTS (SELECT 1 FROM media_assets WHERE id=? AND user_id=? AND moderation='approved')
@@ -72,8 +80,11 @@ export async function reserveTask(
         input.assetA,
         input.assetB,
         mock ? "mock" : "wavespeed",
-        mock ? "local-test-animation" : "bytedance/seedance-2.5/video-edit",
-        mock ? 0 : Math.round(42 * spec.rate * 100),
+        mock ? "local-test-animation" : H3_MODEL,
+        template.id,
+        template.version,
+        template.duration,
+        mock ? 0 : estimateCost(template.duration, input.resolution),
         now,
         now,
         userId,

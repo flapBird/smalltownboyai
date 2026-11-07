@@ -201,6 +201,7 @@ type User = {
   wallet: { balance: number; reserved: number; tier: number };
 };
 type Video = {
+  template_id?: string | null;
   id: string;
   status: string;
   resolution: string;
@@ -366,6 +367,9 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
                   : v.status.replaceAll("_", " ")}
               </h3>
               <p>
+                {v.template_id
+                  ? `${v.template_id === "living-room" ? "Living room" : v.template_id === "red-fence" ? "Red fence" : v.template_id} · `
+                  : ""}
                 {v.resolution}{" "}
                 {v.provider === "mock"
                   ? "requested · test clip is 480 × 854, 3s"

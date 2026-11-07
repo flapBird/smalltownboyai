@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { SPECS, type Resolution } from "@/lib/catalog";
+import type { PublicTemplate } from "@/lib/templates";
 type Photo = { url: string; id?: string; sample?: boolean };
 type Task = {
   id: string;
@@ -85,6 +86,7 @@ async function clearDraft(key: string) {
 }
 export function Generator() {
   const [photos, setPhotos] = useState<(Photo | null)[]>([null, null]);
+  const [templateId, setTemplateId] = useState("living-room");
   const [resolution, setResolution] = useState<Resolution>("480p");
   const [user, setUser] = useState<{
     wallet: { balance: number; tier: number };
@@ -93,6 +95,7 @@ export function Generator() {
     mock: false,
     generation: false,
     resolutions: [] as string[],
+    templates: [] as PublicTemplate[],
   });
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
@@ -105,7 +108,20 @@ export function Generator() {
   const key = useRef<string | null>(null);
   useEffect(() => {
     api("config")
-      .then(setConfig)
+      .then((c) => {
+        setConfig(c);
+        const saved = localStorage.getItem("smalltown-template");
+        const available = c.templates.filter(
+          (t: PublicTemplate) => t.available,
+        );
+        setTemplateId(
+          available.find((t: PublicTemplate) => t.id === saved)?.id ||
+            available[0]?.id ||
+            c.templates[0]?.id ||
+            "living-room",
+        );
+        if (!c.mock && c.resolutions.length) setResolution(c.resolutions[0]);
+      })
       .catch(() => {});
     api("me")
       .then(setUser)
@@ -196,6 +212,17 @@ export function Generator() {
       location.href = "/login?next=" + encodeURIComponent("/#create");
       return;
     }
+    if (
+      !config.mock &&
+      (!config.generation ||
+        !config.resolutions.includes(resolution) ||
+        !config.templates.some((t) => t.id === templateId && t.available))
+    ) {
+      setMessage(
+        "This template and resolution are not available for generation yet.",
+      );
+      return;
+    }
     if (!photos[0] || !photos[1]) {
       setMessage("Add a photo for each character first.");
       return;
@@ -221,14 +248,12 @@ export function Generator() {
         const body = new FormData();
         body.append("file", f);
         const r = await fetch("/api/uploads", { method: "POST", body });
-        const d: any = await r
-          .json()
-          .catch(() => ({
-            error:
-              r.status === 413
-                ? "Image is too large. Use a file under 8 MB."
-                : "Upload failed. Please try again.",
-          }));
+        const d: any = await r.json().catch(() => ({
+          error:
+            r.status === 413
+              ? "Image is too large. Use a file under 8 MB."
+              : "Upload failed. Please try again.",
+        }));
         if (!r.ok) throw new Error(d.error);
         ids.push(d.id);
         setPhotos((p) =>
@@ -240,6 +265,7 @@ export function Generator() {
         assetA: ids[0],
         assetB: ids[1],
         resolution,
+        templateId,
         requestKey: key.current,
         consent: true,
       });
@@ -261,6 +287,63 @@ export function Generator() {
       <div className="generator-panel">
         <div className="step-title">
           <span className="step-number">1</span>
+          <div>
+            <h2>Choose your dance</h2>
+            <p>Two scenes. One unforgettable double act.</p>
+          </div>
+        </div>
+        <div className="template-grid" role="group" aria-label="Dance template">
+          {config.templates.map((t) => (
+            <div
+              key={t.id}
+              className={
+                "template-card " + (templateId === t.id ? "selected" : "")
+              }
+            >
+              {t.previewUrl ? (
+                <video
+                  key={t.previewUrl}
+                  src={t.previewUrl}
+                  controls
+                  muted
+                  playsInline
+                  preload="metadata"
+                  aria-label={`${t.name} ${config.mock ? "test animation" : "source template"}`}
+                />
+              ) : (
+                <div className="template-placeholder">
+                  <Play size={24} />
+                  <span>Preview coming soon</span>
+                </div>
+              )}
+              <button
+                type="button"
+                aria-pressed={templateId === t.id}
+                disabled={!!busy || !!active}
+                onClick={() => {
+                  setTemplateId(t.id);
+                  localStorage.setItem("smalltown-template", t.id);
+                  key.current = null;
+                }}
+              >
+                <strong>{t.name}</strong>
+                <span>{t.description}</span>
+                <small>
+                  {config.mock
+                    ? "Demo preview · simulated output"
+                    : `14s · 9:16${t.available ? "" : " · Coming soon"}`}
+                </small>
+              </button>
+            </div>
+          ))}
+        </div>
+        <p className="field-note">
+          A is the foreground character; B is the background character. Live
+          results keep the template audio.
+        </p>
+        <div className="generator-divider" />
+        <div className="step-title">
+          <span className="step-number">2</span>
           <div>
             <h2>Upload your two characters</h2>
             <p>A great duo starts with two great photos.</p>
@@ -335,7 +418,7 @@ export function Generator() {
         </div>
         <div className="generator-divider" />
         <div className="step-title settings-title">
-          <span className="step-number">2</span>
+          <span className="step-number">3</span>
           <h2>Make it your own</h2>
         </div>
         <div className="settings-grid">
@@ -362,7 +445,9 @@ export function Generator() {
             <p className="field-note">
               {config.mock
                 ? "Test mode · simulated specifications"
-                : "Final specifications pending validation"}
+                : config.generation
+                  ? "14-second vertical MP4 · cleared template audio"
+                  : "Live generation is coming soon"}
             </p>
           </fieldset>
           <div className="credit-settings">

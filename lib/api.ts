@@ -16,6 +16,13 @@ import {
 } from "./payments";
 import { imageInfo, validSignature, signedMediaURL } from "./media";
 import { WaveSpeed } from "./providers/wavespeed";
+import {
+  getTemplate,
+  publicTemplates,
+  verifiedTemplates,
+  signedTemplateURL,
+  validTemplateSignature,
+} from "./templates";
 const json = (
   data: unknown,
   status = 200,
@@ -50,12 +57,15 @@ async function objectResponse(
   key: string,
   download = false,
   range?: string | null,
+  etag?: string,
 ) {
-  const object = await e.MEDIA.get(
-    key,
-    range ? { range: new Headers({ range }) } : {},
-  );
+  const object = await e.MEDIA.get(key, {
+    ...(range ? { range: new Headers({ range }) } : {}),
+    ...(etag ? { onlyIf: { etagMatches: etag } } : {}),
+  });
   if (!object) throw new AppError(404, "File not found.");
+  if (!("body" in object))
+    throw new AppError(409, "Template changed; validation is required.");
   const headers = new Headers({
     "Content-Type":
       object.httpMetadata?.contentType || "application/octet-stream",
@@ -134,6 +144,7 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
         mock,
         generation: liveResolutions(e).length > 0,
         resolutions: liveResolutions(e),
+        templates: publicTemplates(e, mock),
         google: !!(
           e.GOOGLE_CLIENT_ID &&
           e.GOOGLE_CLIENT_SECRET &&
@@ -141,6 +152,36 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
         ),
         payments: e.PAYMENTS_ENABLED === "true",
       });
+    if (r.method === "GET" && parts[0] === "templates" && parts.length === 3) {
+      const template = getTemplate(parts[1]);
+      if (!template) throw new AppError(404, "Template not found.");
+      if (parts[2] === "preview") {
+        if (mock)
+          return await objectResponse(
+            e,
+            "fixtures/mock.mp4",
+            false,
+            r.headers.get("range"),
+          );
+        if (e.REFERENCE_LICENSE_CONFIRMED !== "true")
+          throw new AppError(404, "Preview unavailable.");
+      } else if (parts[2] === "source") {
+        if (
+          e.REFERENCE_LICENSE_CONFIRMED !== "true" ||
+          !e.MEDIA_SIGNING_SECRET ||
+          !verifiedTemplates(e).some((t) => t.id === template.id) ||
+          !(await validTemplateSignature(e.MEDIA_SIGNING_SECRET, template, url))
+        )
+          throw new AppError(404, "Template not found.");
+      } else throw new AppError(404, "Not found.");
+      return await objectResponse(
+        e,
+        template.objectKey,
+        false,
+        r.headers.get("range"),
+        template.etag,
+      );
+    }
     if (!["GET", "HEAD"].includes(r.method)) sameOrigin(e, r);
     if (r.method === "POST" && path === "mock/signin") {
       if (!mock) throw new AppError(404, "Not found.");
@@ -202,7 +243,7 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
       const u = signed ? null : await identity(e, r);
       if (!signed && u?.id !== asset.user_id && u?.role !== "admin")
         throw new AppError(404, "File not found.");
-      return objectResponse(e, asset.object_key);
+      return await objectResponse(e, asset.object_key);
     }
     const u = await requireUser(e, r);
     if (r.method === "GET" && path === "me") {
@@ -352,7 +393,8 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
         .object({
           assetA: z.string().uuid(),
           assetB: z.string().uuid(),
-          resolution: z.enum(["480p", "720p", "1080p"]),
+          resolution: z.enum(["480p", "768p", "1080p"]),
+          templateId: z.string().min(1).max(50),
           requestKey: z.string().uuid(),
           consent: z.literal(true),
         })
@@ -362,6 +404,28 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
           503,
           "Live generation is awaiting model and reference-video validation.",
         );
+      const template = getTemplate(b.templateId);
+      if (!template) throw new AppError(400, "Unknown dance template.");
+      if (!mock) {
+        if (!verifiedTemplates(e).some((t) => t.id === template.id))
+          throw new AppError(
+            503,
+            "This dance template is awaiting validation.",
+          );
+        const source = await e.MEDIA.head(template.objectKey);
+        if (!source || source.etag !== template.etag)
+          throw new AppError(
+            503,
+            "Template missing or changed; validation is required.",
+          );
+      }
+      const templateURL = mock
+        ? ""
+        : await signedTemplateURL(
+            e.APP_ORIGIN,
+            template,
+            e.MEDIA_SIGNING_SECRET!,
+          );
       const result = await reserveTask(e.DB, u.id, b, mock);
       if (result.created) {
         if (mock) {
@@ -386,10 +450,10 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
             const providerId = await new WaveSpeed(
               e.WAVESPEED_API_KEY!,
             ).submitTask({
-              video: e.REFERENCE_VIDEO_URL!,
+              video: templateURL,
               images: urls as [string, string],
               resolution: b.resolution,
-              inputDuration: 21,
+              inputDuration: result.task.input_duration,
             });
             await e.DB.prepare(
               "UPDATE video_tasks SET status='processing',provider_task_id=?,updated_at=? WHERE id=?",
@@ -440,7 +504,7 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
       if (r.method === "GET" && parts[2] === "video") {
         if (t.status !== "completed" || !t.output_key)
           throw new AppError(404, "Video not available.");
-        return objectResponse(
+        return await objectResponse(
           e,
           t.output_key,
           url.searchParams.get("download") === "1",
@@ -489,7 +553,7 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
           .bind(parts[2])
           .first<{ output_key: string }>();
         if (!t?.output_key) throw new AppError(404, "No video.");
-        return objectResponse(e, t.output_key);
+        return await objectResponse(e, t.output_key);
       }
       if (r.method === "POST" && path === "admin/action") {
         const b = z

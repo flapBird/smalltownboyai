@@ -12,7 +12,14 @@ import {
   verifyPaymentEvent,
   processPaymentEvent,
   cents,
+  createCheckout,
 } from "../lib/payments";
+import { PACKAGES } from "../lib/catalog";
+import {
+  TEMPLATES,
+  signedTemplateURL,
+  validTemplateSignature,
+} from "../lib/templates";
 import { WaveSpeed } from "../lib/providers/wavespeed";
 import { handle } from "../lib/api";
 import { reconcile } from "../lib/jobs";
@@ -81,8 +88,9 @@ async function user(balance = 600, tier = 3) {
 }
 const input = (
   assets: string[],
-  resolution: "480p" | "720p" | "1080p" = "480p",
+  resolution: "480p" | "768p" | "1080p" = "480p",
 ) => ({
+  templateId: "living-room",
   assetA: assets[0],
   assetB: assets[1],
   resolution,
@@ -137,7 +145,7 @@ describe("D1 money and task invariants", () => {
   it("rejects higher resolution for Lite even with enough credits", async () => {
     const u = await user(1000, 1);
     await expect(
-      reserveTask(db, u.id, input(u.assets, "720p"), true),
+      reserveTask(db, u.id, input(u.assets, "768p"), true),
     ).rejects.toThrow();
     expect((await wallet(u.id))?.balance).toBe(1000);
   });
@@ -365,14 +373,20 @@ describe("signed webhooks and provider contract", () => {
         string,
       ],
       resolution: "480p" as const,
-      inputDuration: 21,
+      inputDuration: 14,
     };
-    expect(p.calculateCost(i)).toBe(462);
+    expect(p.calculateCost(i)).toBe(144);
     expect(await p.submitTask(i)).toBe("real-shape-id");
     expect(JSON.parse(transport.mock.calls[0][1].body)).toMatchObject({
       generate_audio: false,
+      duration: 14,
+      aspect_ratio: "9:16",
+      resolution: "480p",
       reference_images: i.images,
     });
+    expect(transport.mock.calls[0][0]).toBe(
+      "https://api.wavespeed.ai/api/v3/wavespeed-ai/minimax-h3/video-edit",
+    );
     expect(await p.queryTask("real-shape-id")).toMatchObject({
       status: "completed",
       url: "https://cdn.example/out.mp4",
@@ -580,15 +594,15 @@ describe("recovery and deletion regressions", () => {
       GENERATION_ENABLED: "true",
       WAVESPEED_API_KEY: "test",
       MEDIA_SIGNING_SECRET: "test",
-      REFERENCE_VIDEO_URL: "https://example.invalid/reference.mp4",
+      VERIFIED_TEMPLATES: "living-room",
       REFERENCE_LICENSE_CONFIRMED: "true",
-      VERIFIED_RESOLUTIONS: "480p, 720p,bogus",
+      VERIFIED_RESOLUTIONS: "480p, 768p,720p,bogus",
     };
     const read = async (env: Bindings) =>
       (await handle(new Request("http://localhost/api/config"), env)).json();
     expect(await read(conf)).toMatchObject({
       generation: true,
-      resolutions: ["480p", "720p"],
+      resolutions: ["480p", "768p"],
     });
     expect(await read({ ...conf, WAVESPEED_API_KEY: undefined })).toMatchObject(
       { generation: false, resolutions: [] },
@@ -629,5 +643,215 @@ describe("recovery and deletion regressions", () => {
         .bind(u.id)
         .first(),
     ).toMatchObject({ n: 1 });
+  });
+});
+
+describe("H3 templates, prices and private source access", () => {
+  it("charges 100/200/400 credits and snapshots H3 base costs with both images", async () => {
+    for (const [resolution, credits, cost] of [
+      ["480p", 100, 144],
+      ["768p", 200, 284],
+      ["1080p", 400, 564],
+    ] as const) {
+      const u = await user();
+      const { task } = await reserveTask(
+        db,
+        u.id,
+        { ...input(u.assets, resolution), templateId: "red-fence" },
+        false,
+      );
+      expect(task).toMatchObject({
+        credits,
+        estimated_cost: cost,
+        input_duration: 14,
+        template_id: "red-fence",
+        template_version: 1,
+        model: "wavespeed-ai/minimax-h3/video-edit",
+      });
+      expect(await wallet(u.id)).toMatchObject({
+        balance: 600 - credits,
+        reserved: credits,
+      });
+      await settleTask(db, task.id, false);
+      expect(await wallet(u.id)).toMatchObject({ balance: 600, reserved: 0 });
+    }
+  });
+  it("rejects replay with a different template without another reservation", async () => {
+    const u = await user();
+    const i = input(u.assets);
+    await reserveTask(db, u.id, i, true);
+    await expect(
+      reserveTask(db, u.id, { ...i, templateId: "red-fence" }, true),
+    ).rejects.toThrow("different task");
+    await expect(
+      reserveTask(
+        db,
+        u.id,
+        { ...input(u.assets), templateId: "../../uploads/private" },
+        true,
+      ),
+    ).rejects.toThrow("Unknown dance template");
+    expect(await wallet(u.id)).toMatchObject({ balance: 500, reserved: 100 });
+  });
+  it("snapshots new package amounts and preserves existing order amounts", async () => {
+    const u = await user(0, 0);
+    const legacy = await order(u.id);
+    for (const p of PACKAGES) {
+      const result = await createCheckout(
+        e,
+        { id: u.id, email: "test@example.invalid" },
+        p.id,
+        true,
+      );
+      const id = new URL(result.url, "http://localhost").searchParams.get(
+        "order",
+      );
+      expect(
+        await db
+          .prepare("SELECT cents,credits,tier FROM payment_orders WHERE id=?")
+          .bind(id)
+          .first(),
+      ).toEqual({ cents: p.cents, credits: p.credits, tier: p.tier });
+      expect(
+        await db
+          .prepare("SELECT cents,credits,tier FROM credit_packages WHERE id=?")
+          .bind(p.id)
+          .first(),
+      ).toEqual({ cents: p.cents, credits: p.credits, tier: p.tier });
+    }
+    expect(
+      await db
+        .prepare("SELECT cents FROM payment_orders WHERE id=?")
+        .bind(legacy.id)
+        .first(),
+    ).toEqual({ cents: 890 });
+  });
+  it("rejects unsupported H3 duration and resolution before any paid request", async () => {
+    const transport = vi.fn();
+    const p = new WaveSpeed("key", transport);
+    const i = {
+      video: "https://example.invalid/v.mp4",
+      images: ["https://example.invalid/a", "https://example.invalid/b"] as [
+        string,
+        string,
+      ],
+      resolution: "480p" as const,
+      inputDuration: 14,
+    };
+    for (const inputDuration of [2, 16, 21, NaN, 14.2])
+      await expect(p.submitTask({ ...i, inputDuration })).rejects.toThrow(
+        "Unsupported",
+      );
+    await expect(
+      p.submitTask({ ...i, resolution: "720p" as "480p" }),
+    ).rejects.toThrow("Unsupported");
+    expect(transport).not.toHaveBeenCalled();
+  });
+  it("binds source signatures to template, version, object identity and expiration", async () => {
+    const t = TEMPLATES[0];
+    const url = new URL(
+      await signedTemplateURL("https://example.invalid", t, "secret"),
+    );
+    expect(await validTemplateSignature("secret", t, url)).toBe(true);
+    expect(await validTemplateSignature("secret", TEMPLATES[1], url)).toBe(
+      false,
+    );
+    expect(
+      await validSignature(
+        "secret",
+        t.id,
+        url.searchParams.get("expires")!,
+        url.searchParams.get("signature")!,
+      ),
+    ).toBe(false);
+    url.searchParams.set("version", "2");
+    expect(await validTemplateSignature("secret", t, url)).toBe(false);
+    url.searchParams.set("version", "1");
+    url.searchParams.set("expires", "1");
+    expect(await validTemplateSignature("secret", t, url)).toBe(false);
+  });
+  it("does not expose template objects without valid source signatures or preview clearance", async () => {
+    const conf = {
+      ...e,
+      APP_MODE: "production",
+      MEDIA_SIGNING_SECRET: "secret",
+      VERIFIED_TEMPLATES: "living-room",
+    };
+    for (const path of [
+      "living-room/source",
+      "living-room/preview",
+      "unknown/source",
+    ])
+      expect(
+        (
+          await handle(
+            new Request("http://localhost/api/templates/" + path),
+            conf,
+          )
+        ).status,
+      ).toBe(404);
+    const url = await signedTemplateURL(
+      "http://localhost",
+      TEMPLATES[0],
+      "secret",
+    );
+    const approved = { ...conf, REFERENCE_LICENSE_CONFIRMED: "true" };
+    await e.MEDIA.put(TEMPLATES[0].objectKey, new Uint8Array([1, 2, 3]));
+    expect((await handle(new Request(url), approved)).status).toBe(409);
+    expect(
+      (await handle(new Request(url), { ...approved, VERIFIED_TEMPLATES: "" }))
+        .status,
+    ).toBe(404);
+  });
+  it("streams local template previews with range support and no arbitrary object access", async () => {
+    const clip = readFileSync("public/fixtures/mock.mp4");
+    await e.MEDIA.put("fixtures/mock.mp4", clip, {
+      httpMetadata: { contentType: "video/mp4" },
+    });
+    const r = await handle(
+      new Request("http://localhost/api/templates/red-fence/preview", {
+        headers: { range: "bytes=0-31" },
+      }),
+      e,
+    );
+    expect(r.status).toBe(206);
+    expect(r.headers.get("content-range")).toBe(`bytes 0-31/${clip.length}`);
+    expect(new Uint8Array(await r.arrayBuffer())).toEqual(
+      new Uint8Array(clip.subarray(0, 32)),
+    );
+    const config = (await (
+      await handle(new Request("http://localhost/api/config"), e)
+    ).json()) as { templates: unknown[] };
+    expect(config.templates).toHaveLength(2);
+    expect(JSON.stringify(config)).not.toContain("objectKey");
+    expect(JSON.stringify(config)).not.toContain("etag");
+  });
+  it("accepts the chosen template through the API and rejects old 720p", async () => {
+    const u = await user();
+    const headers = await authenticated(u.id);
+    const b = {
+      ...input(u.assets, "768p"),
+      templateId: "red-fence",
+      consent: true,
+    };
+    const send = (body: unknown) =>
+      handle(
+        new Request("http://localhost/api/tasks", {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+        }),
+        e,
+      );
+    const r = await send(b);
+    expect(r.status).toBe(201);
+    expect(await r.json()).toMatchObject({
+      template_id: "red-fence",
+      template_version: 1,
+      resolution: "768p",
+      credits: 200,
+    });
+    expect((await send({ ...b, resolution: "720p" })).status).toBe(400);
+    expect(await wallet(u.id)).toMatchObject({ balance: 400, reserved: 200 });
   });
 });

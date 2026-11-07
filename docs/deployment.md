@@ -2,7 +2,7 @@
 
 2026-11-06 的远程检查已确认 Web / Jobs Worker、共享 D1、私有 R2 与 Cron 配置存在，但真实业务尚未验收。默认真实收款与生成均关闭。
 
-2026-11-07 更新执行方案：目标为 **MiniMax H3 Video Edit、14 秒、两个可选模板**；当前代码仍是 Seedance 2.5、21 秒和单个 `REFERENCE_VIDEO_URL`。下列待办不代表已经实现。
+2026-11-07：本地已接入 **MiniMax H3 Video Edit、14 秒、两个可选模板、480p / 768p / 1080p**，尚未发布本轮改动或进行真实付费生成。不能把本地测试视为模型效果验收。
 
 ## Cloudflare
 
@@ -43,7 +43,9 @@ npm run jobs:deploy
 
 Web Worker 需要 `WAFFO_MERCHANT_ID`、`WAFFO_PRIVATE_KEY`、`WAFFO_PRODUCT_LITE`、`WAFFO_PRODUCT_STANDARD`、`WAFFO_PRODUCT_PRO`。先用测试环境 API 凭据，`WAFFO_ENVIRONMENT=test`，设置 `PAYMENTS_ENABLED=true` 才允许真实 SDK 测试 checkout。
 
-在 Waffo 创建三个一次性 USD 商品，价格为 8.90 / 16.90 / 49.90；商品 metadata 分别设置 `packageId=lite|standard|pro`。服务端订单 metadata 包含 `productId` 和 `packageId`。Webhook URL：`https://smalltownboyai.one/api/webhooks/waffo`，签名头 `x-waffo-signature`。
+在 Waffo 创建三个一次性 USD 商品，价格为 4.90 / 12.90 / 24.90；对应积分为 100 / 300 / 600；商品 metadata 分别设置 `packageId=lite|standard|pro`。服务端订单 metadata 包含 `productId` 和 `packageId`。Webhook URL：`https://smalltownboyai.one/api/webhooks/waffo`，签名头 `x-waffo-signature`。
+
+新价格上线前，在 Waffo 创建对应的新商品或核对商品价格，并更新三个 `WAFFO_PRODUCT_*`，不要继续使用旧金额商品。现有订单按创建时保存的金额/积分核验，迁移不会改旧订单或用户余额。定价依据见 [成本与定价](pricing.md)。
 
 **Checkout 环境由 API 凭据决定**，本项目的 `WAFFO_ENVIRONMENT` 用于 webhook 模式检查与验签，不会把生产 key 自动变成测试 key。必须从商户后台确认 key 类型、商品及实际 checkout 环境后才启用。真实收款另需 `MERCHANT_APPROVED=true` 与 `WAFFO_ENVIRONMENT=prod`，只能在商户审核通过后设置。
 
@@ -51,27 +53,38 @@ Web Worker 需要 `WAFFO_MERCHANT_ID`、`WAFFO_PRIVATE_KEY`、`WAFFO_PRODUCT_LIT
 
 参考：https://github.com/waffo-com/waffo-pancake-sdk-ts 、https://docs.waffo.ai/
 
-## 最新执行清单（H3 / 14 秒，待实施）
+## 最新执行清单
 
-1. **准备模板**：将客厅版、红围栏版分别整理为 14 秒、9:16 的 MP4，检查实际时长、画幅、动作完整性和音画同步。视频画面与配乐分别核对使用权限，不再要求所有模板必须去掉音轨；默认带可使用的配乐，无合适配乐时可先测试静音画面。
-2. **上传私有 R2**：复用 `smalltownboyai-private`，建议对象键为 `templates/living-room-14s.mp4`、`templates/red-fence-14s.mp4`。上传后记录对象键、时长和音轨信息。保留桶私有，不开启整个桶的公开访问。原始模板与首页成片示例分开，审核通过的示例建议放 `examples/`。
-3. **实现模板配置与访问**：建立服务端模板白名单，包含稳定 ID、名称、R2 对象键、时长、角色位置说明、预览资源和启用状态。为供应商生成有足够取件时间的短期 HTTPS 签名链接，并验证到期失效；Cloudflare 控制台链接、R2 对象键都不能直接用作模型输入 URL。现有上传图片的签名接口不会自动公开任意模板对象。
-4. **实现用户选择**：两张模板预览卡默认选中一个，用户可切换，无需额外确认步骤；只有一个合格模板时先固定使用该模板。流程为“确认模板 → 上传角色 A / B 图片 → 选择已验证画质 → 生成”。预览标明两个角色的位置；前端只传模板 ID，服务端校验启用状态并解析素材。任务保存模板 ID / 版本，审核提交及历史结果应对应同一模板。当前前后端均未实现模板选择。
-5. **迁移模型与规格**：接入 `wavespeed-ai/minimax-h3/video-edit`，同步请求参数、角色提示词、14 秒时长、费用计算、任务记录、规格校验、积分/套餐展示、FAQ 和测试。H3 支持 480p / 540p / 768p / 1080p，不能沿用 720p；初测用 480p，其他规格通过实测后再开放。不要仅改模型 URL 就启用真实服务。
-6. **落实声音方案**：优先用已配好可使用音轨的模板，设置 `generate_audio:false` 保留其音轨，并实测同步情况。静音模板不会因此获得歌曲。默认有声、可下载无声版本是建议的产品方案，无声导出/后期配乐尚未实现，需另行完成处理和下载链路；播放器静音不等于下载无声文件。
-7. **先做小额模型测试**：先用截取的 5 秒模板与两张宠物图在 480p 测试，再测完整 14 秒；逐一验证两种模板的角色一致性、动作、镜头、时长、声音、耗时和实际账单。测试实际调用会消耗供应商额度。每个模板合格后才对用户启用；一次任务只提交所选的一个模板和两张图，不需要把两个模板各生成一次。
-8. **配置并跑通站内流程**：配置正式域名、Google OAuth、管理员与测试积分、两个 Worker 的 WaveSpeed 密钥、媒体签名密钥及 Jobs 输出域名白名单；在受控测试环境启用已验证规格，跑通登录 → 选模板 → 上传 → 输入审核 → 生成 → Jobs 回收 → 私有 R2 → 输出审核 → 预览/下载与账本。验证失败释放、unknown 人工处理、过期链接和重复操作。开发环境与生产配置分开。
-9. **准备上线**：用审核通过的真实成片替换首页概念示例，通过受控公开接口提供示例/模板预览；不公开用户原图和私人结果。完成 Waffo sandbox 付款、重发、退款与正式商户配置，以及支持邮箱、运营信息和政策。检查构建与测试，发布 Web / Jobs，验证域名、远程资源、Cron 实际执行、下载和监控，再开放真实生成及收款。
+### 已完成的代码与素材核对
+
+- R2 `smalltownboyai-private` 中已存在 `templates/living-room-14s.mp4` 和 `templates/red-fence-14s.mp4`。2026-11-07 读取 MP4 元数据，两段均为 14 秒且有音轨；客厅显示尺寸 540×960，红围栏约 539.5×960。未据此判定动作质量、配乐许可或生成效果合格。
+- `lib/templates.ts` 定义两套模板、版本及核对时的 ETag。首页可选择模板，默认选中一个，登录回跳保留选择；任务与历史记录模板 ID / 版本。每次生成只使用选定的一套模板和两张图片。
+- 服务端只接受白名单模板 ID。`/api/templates/:id/source` 使用限定模板、版本、ETag 与 30 分钟期限的签名；提交前核对源对象 ETag，读取时使用 R2 条件请求防止文件被替换。旧上传照片签名不能用于模板。
+- H3 请求指定 `duration:14`、`aspect_ratio:"9:16"`、两张参考图和 `generate_audio:false`，保留模板音轨。静音模板不会自动获得歌曲。中档使用用户确认的 **768p**，不假标 720p；不提供 540p 档。
+- 新任务冻结 100 / 200 / 400 积分，分别按 144 / 284 / 564 美分估算基础模型成本；套餐与费用说明已同步，旧订单仍保留原金额和积分。
+- 新迁移 `0002_concerned_lightspeed.sql` 为任务增加可空的模板 ID / 版本，并更新套餐目录；保留历史 Seedance 任务、订单、余额和账本。远程数据库尚未执行该迁移。
+
+### 仍需执行
+
+1. 核对两段素材的动作完整性、角色位置、音画同步及画面/配乐使用权限。源素材约 540p；高分辨率输出的细节和身份一致性必须实测，不能凭请求参数判断。
+2. 用 5 秒裁剪片 + 两张宠物图先测 H3 480p，再逐一测试两套 14 秒模板和准备开放的画质。记录实际账单、失败收费、耗时、尺寸、双角色稳定性与声音。测试会消耗 WaveSpeed 额度。
+3. 按下节配置凭据与开关；在受控测试环境开放已验证模板/画质，跑通登录 → 选模板 → 上传 → 输入审核 → 生成 → Jobs 回收 → 私有 R2 → 输出审核 → 下载/历史/账本。验证失败释放、unknown 人工处理、签名到期、未验证模板和重复提交。
+4. 应用远程迁移后发布 Web / Jobs；配置正式域名、Google OAuth、管理员、支持邮箱、运营主体和政策，检查 Cron 实际执行及输出域名白名单。
+5. 完成 Waffo sandbox 付款、重发、退款与正式商户配置，确认新商品金额，再开放收款。使用审核通过的真实成片替换首页概念图，示例放 `examples/` 并单独提供受控公开读取；用户上传和私人结果保持私有。
+6. 默认有声已由模板音轨保留实现；**无声文件下载和后期配乐尚未实现**，播放器静音不会改变下载的文件。若需要额外无声导出，另行实现处理链路。
 
 ## WaveSpeed 与参考视频配置
 
-Web Worker 需要 `WAVESPEED_API_KEY` 和 `MEDIA_SIGNING_SECRET`。当前代码还依赖单个 `REFERENCE_VIDEO_URL`；多模板迁移完成后，应由服务端依据所选模板生成签名 URL，并同步更新环境检查，不能把多个地址填进这个变量。配置 `REFERENCE_LICENSE_CONFIRMED=true` 前核对已启用模板的画面与音轨使用权限。
+Web Worker 需要 `WAVESPEED_API_KEY`、`MEDIA_SIGNING_SECRET`，不再读取 `REFERENCE_VIDEO_URL`。R2 保持私有，不开启整个桶的公开访问。
 
-Jobs Worker 也必须设置 `WAVESPEED_API_KEY`；`OUTPUT_HOSTS` 填供应商实测返回的精确 HTTPS CDN 主机名（逗号分隔，无通配符），拒绝重定向下载，最大 50 MiB。不要猜测主机名。Web Worker 的可选同名配置不会替代 Jobs 配置。
+- `REFERENCE_LICENSE_CONFIRMED=true`：在确认两套白名单模板的画面与配乐可使用后设置。**此配置也会开放两套模板的 `/api/templates/:id/preview` 预览接口**，只返回白名单源片，不允许任意 R2 对象键。未确认时前端显示预览待开放；本地 Mock 使用明确标注的 3 秒测试动画。
+- `VERIFIED_TEMPLATES=living-room,red-fence`：只填已通过真实测试的模板 ID，可先仅启用一套。任务提交、签名源访问均检查该白名单。修改模板文件会导致 ETag 不匹配并阻止使用；换素材应使用新对象键、更新模板版本及 ETag、重新验证，不要覆盖已发布版本。
+- `VERIFIED_RESOLUTIONS=480p,768p,1080p`：只填已验证规格，旧值 `720p` 会被忽略。支持能力不代表三档都已通过测试。
+- `GENERATION_ENABLED=true`：只有凭据、许可、模板和画质配置齐全才可提交真实请求；本轮保持关闭。供应商必须能通过站点域名访问短期签名链接，Cloudflare 后台地址不能当作视频 URL。实测排队取件时间应在签名期限内。
 
-完成 H3 迁移及各规格的 14 秒输出验证后，才将规格加入 `VERIFIED_RESOLUTIONS` 并设置 `GENERATION_ENABLED=true`。先审核输入，再提交；输出复制到 R2 后进入 `review`，管理员检查真实尺寸、时长、角色映射、内容与音轨，记录实际成本及输出秒数，再批准交付。
+Jobs Worker 也必须设置 `WAVESPEED_API_KEY`；`OUTPUT_HOSTS` 填供应商实测返回的精确 HTTPS CDN 主机名（逗号分隔，无通配符），拒绝重定向下载，最大 50 MiB。Web Worker 的可选同名配置不会替代 Jobs 配置。
 
-H3 的 `generate_audio:false` 保留输入音轨；输出支持 3–15 秒。官方说明：[MiniMax H3 Video Edit](https://wavespeed.ai/models/wavespeed-ai/minimax-h3/video-edit)（2026-11-07 核对）。这些能力说明不代替本站真实调用验收。
+先审核输入，再提交；输出复制到 R2 后进入 `review`，管理员检查真实尺寸、时长、角色映射、内容与音轨，记录实际成本及输出秒数，再批准交付。官方参数依据：[MiniMax H3 Video Edit](https://wavespeed.ai/models/wavespeed-ai/minimax-h3/video-edit)（2026-11-07 核对）。
 
 ## 异常恢复与保留
 
