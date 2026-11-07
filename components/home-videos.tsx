@@ -16,22 +16,21 @@ export function HomeVideos({ hero = false }: { hero?: boolean }) {
       <section className="studio-hero">
         <div className="studio-hero-copy">
           <span className="studio-kicker hero-pill">
-            <Film size={15} /> TWO PHOTOS. TWO PERSONALITIES.
+            <Film size={15} /> THE TWO-PHOTO DANCE STUDIO
           </span>
           <h1>
-            Turn 2 photos into
+            Two pets.
             <br />
-            <span>Smalltown Boy AI</span>
+            One iconic
             <br />
-            dance videos.
+            <span>double act.</span>
           </h1>
           <p>
-            The look. The reaction. The dance.
-            <br />
-            Give your favorite pets their own 14-second double act.
+            Turn two favorite photos into a 14-second Smalltown Boy-inspired
+            dance.
           </p>
           <a href="#create" className="button button-primary hero-create">
-            Create your duo <ArrowUpRight size={20} />
+            Make your duo <ArrowUpRight size={20} />
           </a>
           <div className="hero-facts">
             <span>2 pet photos</span>
@@ -39,18 +38,36 @@ export function HomeVideos({ hero = false }: { hero?: boolean }) {
             <span>No prompts needed</span>
           </div>
         </div>
-        <div className="studio-hero-video">
-          <PreviewVideo
-            src={templates[0]?.previewUrl}
-            label="Living room dance"
-            autoPlay
-            badge={
-              templates[0]?.previewKind === "demo"
-                ? "LOCAL TEST CLIP"
-                : "TEMPLATE PREVIEW"
-            }
-          />
-          <p>Preview the choreography. Your pets are next.</p>
+        <div className="hero-video-pair">
+          <div className="studio-hero-video">
+            <PreviewVideo
+              src={templates[0]?.previewUrl}
+              label="Living room dance"
+              autoPlay
+              badge={
+                templates[0]?.previewKind === "demo"
+                  ? "LOCAL TEST CLIP"
+                  : "TEMPLATE PREVIEW"
+              }
+            />
+          </div>
+          <div className="hero-second-video">
+            <span className="studio-kicker">MEET THE MOVES</span>
+            <PreviewVideo
+              src={templates[1]?.previewUrl}
+              label="Red fence dance"
+              badge={
+                templates[1]?.previewKind === "demo"
+                  ? "LOCAL TEST CLIP"
+                  : "SOURCE TEMPLATE"
+              }
+            />
+            <p>
+              Source templates
+              <br />
+              14-second choreography
+            </p>
+          </div>
         </div>
       </section>
     );
@@ -59,12 +76,8 @@ export function HomeVideos({ hero = false }: { hero?: boolean }) {
       <span id="examples" className="section-anchor" />
       <div className="section-heading-row">
         <div>
-          <span className="studio-kicker">SEE THE DANCE</span>
-          <h2>
-            Same moves.
-            <br />
-            Your kind of duo.
-          </h2>
+          <span className="studio-kicker">02 / FIND THEIR SCENE</span>
+          <h2>Same moves. Different personalities.</h2>
         </div>
         <p>
           Pick the scene that feels like them.
@@ -86,6 +99,7 @@ export function HomeVideos({ hero = false }: { hero?: boolean }) {
             />
             <div className="showcase-caption">
               <div>
+                <span className="scene-meta">14 SECONDS / TWO PETS</span>
                 <h3>{t.name}</h3>
                 <p>{t.description}</p>
               </div>
@@ -100,7 +114,7 @@ export function HomeVideos({ hero = false }: { hero?: boolean }) {
                   )
                 }
               >
-                <ArrowUpRight size={24} />
+                Use this scene <ArrowUpRight size={18} />
               </a>
             </div>
           </article>

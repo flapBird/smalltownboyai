@@ -2589,3 +2589,310 @@ td {
 .video-controls button {
   white-space: nowrap;
 }
+
+/* Approved Claude Design canvas: Duo Studio. */
+.duo-home {
+  background: #101310;
+  --lime: #c8f976;
+  --muted: #bfc6b8;
+}
+.duo-home .home-container {
+  max-width: 1240px;
+  padding: 0 24px;
+}
+.duo-home .studio-hero {
+  grid-template-columns: 1.2fr 1fr;
+  gap: 60px;
+  padding: 64px 0 80px;
+}
+.duo-home .hero-pill {
+  padding: 0;
+  background: none;
+  border: 0;
+  letter-spacing: 3px;
+}
+.duo-home .hero-pill svg {
+  display: none;
+}
+.duo-home .studio-hero h1 {
+  font-size: 80px;
+  line-height: 0.98;
+  letter-spacing: -5px;
+  text-transform: none;
+  margin: 26px 0;
+}
+.duo-home .studio-hero-copy > p {
+  max-width: 390px;
+}
+.duo-home .hero-create {
+  border-radius: 30px;
+  margin-top: 26px;
+  padding: 17px 28px;
+}
+.hero-video-pair {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.duo-home .studio-hero-video {
+  width: 60%;
+  max-width: none;
+}
+.duo-home .studio-hero-video .preview-player {
+  height: 470px;
+  aspect-ratio: auto;
+  border-radius: 120px 120px 20px 20px;
+}
+.hero-second-video {
+  width: 40%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.hero-second-video .preview-player {
+  height: 300px;
+  aspect-ratio: auto;
+  border-radius: 16px;
+}
+.hero-second-video > p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+.hero-video-pair .video-controls {
+  gap: 5px;
+  left: 8px;
+  right: 8px;
+}
+.hero-video-pair .video-controls button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
+}
+.hero-video-pair .video-controls span,
+.hero-second-video .video-badge {
+  display: none;
+}
+.duo-home .studio-create {
+  border-top: 1px solid #343b31;
+  padding: 54px 0;
+}
+.duo-home .studio-heading h2 {
+  font-size: 38px;
+  letter-spacing: -1.3px;
+}
+.duo-home .studio-workbench {
+  grid-template-columns: 1.55fr 1fr;
+  gap: 32px;
+}
+.duo-home .studio-uploads {
+  gap: 16px;
+}
+.duo-home .pet-upload-card {
+  padding: 20px;
+  border: 1px dashed #626b59;
+  border-radius: 20px;
+}
+.duo-home .pet-dropzone {
+  min-height: 300px;
+  aspect-ratio: auto;
+  border-radius: 14px;
+}
+.duo-home .duo-sync {
+  display: none;
+}
+.duo-home .studio-settings {
+  background: #191e17;
+  border: 1px solid #3c4436;
+  border-radius: 22px;
+  padding: 26px;
+}
+.duo-home .quality-options button.selected {
+  background: var(--lime);
+  color: #16200c;
+}
+.duo-home .quality-options button.selected span {
+  color: #16200c;
+}
+.duo-home .studio-settings .button-primary {
+  border-radius: 28px;
+}
+.duo-home .video-showcase {
+  padding: 64px 0;
+}
+.duo-home .video-showcase .section-heading-row {
+  display: block;
+}
+.duo-home .video-showcase h2 {
+  font-size: 38px;
+  max-width: none;
+}
+.duo-home .video-showcase .section-heading-row > p {
+  max-width: none;
+  margin-top: 16px;
+}
+.duo-home .showcase-grid {
+  max-width: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.duo-home .showcase-card {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  background: #1c2219;
+  border-radius: 20px;
+  padding: 20px;
+  min-width: 0;
+}
+.duo-home .showcase-card > .preview-player {
+  width: 44%;
+  flex-shrink: 0;
+  height: 240px;
+  aspect-ratio: auto;
+  border-radius: 12px;
+}
+.duo-home .showcase-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 0;
+}
+.scene-meta {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #bfc6b8;
+}
+.duo-home .showcase-caption a {
+  width: auto;
+  height: auto;
+  border: 0;
+  display: flex;
+  gap: 8px;
+  font-size: 14px;
+  min-height: 44px;
+}
+.duo-home .showcase-card .video-controls span {
+  display: none;
+}
+.duo-home .showcase-card .video-controls button {
+  padding: 10px;
+  min-width: 44px;
+  min-height: 44px;
+}
+.duo-home .showcase-card .video-badge {
+  font-size: 8px;
+  left: 8px;
+  padding: 6px;
+}
+.duo-home .pricing {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 40px;
+  border-top: 1px solid #343b31;
+  padding: 40px 0 70px;
+}
+.duo-home .pricing .section-head {
+  text-align: left;
+  margin: 0;
+}
+.duo-home .pricing h2 {
+  font-size: 36px;
+  line-height: 1.1;
+}
+.duo-home .pricing-grid {
+  gap: 16px;
+}
+.duo-home .plan {
+  padding: 23px 16px;
+  border: 1px solid #626b59;
+  border-radius: 16px;
+  background: transparent;
+}
+.duo-home .plan-tag {
+  display: none;
+}
+.duo-home .price {
+  font-size: 30px;
+}
+.duo-home .plan .button {
+  padding: 12px 6px;
+}
+.duo-home .pricing > :not(.section-head):not(.pricing-grid) {
+  grid-column: 1/-1;
+}
+@media (max-width: 1050px) {
+  .duo-home .studio-hero h1 {
+    font-size: 64px;
+    letter-spacing: -3px;
+  }
+  .duo-home .studio-hero {
+    gap: 30px;
+  }
+  .duo-home .pricing {
+    grid-template-columns: 1fr;
+  }
+  .duo-home .studio-workbench {
+    grid-template-columns: 1fr;
+  }
+  .duo-home .showcase-card {
+    gap: 14px;
+    padding: 14px;
+  }
+  .duo-home .showcase-caption h3 {
+    font-size: 22px;
+  }
+}
+@media (max-width: 700px) {
+  .duo-home .studio-hero {
+    grid-template-columns: 1fr;
+    padding: 40px 0;
+    gap: 35px;
+  }
+  .duo-home .studio-hero h1 {
+    font-size: 56px;
+    letter-spacing: -3px;
+  }
+  .duo-home .studio-hero-video .preview-player {
+    height: 350px;
+  }
+  .hero-second-video .preview-player {
+    height: 240px;
+  }
+  .duo-home .studio-create,
+  .duo-home .video-showcase {
+    padding: 40px 0;
+  }
+  .duo-home .showcase-grid {
+    grid-template-columns: 1fr;
+  }
+  .duo-home .studio-heading h2,
+  .duo-home .video-showcase h2 {
+    font-size: 32px;
+  }
+  .duo-home .pet-upload-card {
+    padding: 12px;
+  }
+  .duo-home .pet-dropzone {
+    min-height: 240px;
+  }
+  .duo-home .studio-settings {
+    padding: 20px;
+  }
+  .duo-home .pricing-grid {
+    grid-template-columns: 1fr;
+  }
+  .duo-home .plan {
+    padding: 24px;
+  }
+  .duo-home .studio-uploads {
+    gap: 12px;
+  }
+}
+.duo-home .studio-hero-video .video-badge {
+  top: 105px;
+  left: 12px;
+  font-size: 8px;
+}

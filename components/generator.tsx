@@ -311,8 +311,8 @@ export function Generator() {
     <section id="create" className="studio-create">
       <div className="studio-heading">
         <div>
-          <span className="studio-kicker">THE TWO-PHOTO DANCE STUDIO</span>
-          <h2>Meet your next dancing duo.</h2>
+          <span className="studio-kicker">01 / MAKE IT THEIRS</span>
+          <h2>Cast your dancing duo.</h2>
           <p>One photo for each pet. We’ll take care of the moves.</p>
         </div>
         <span className="studio-format">

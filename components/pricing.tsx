@@ -49,8 +49,8 @@ export function Pricing({
   return (
     <section id="pricing" className="section pricing">
       <div className="section-head">
-        <span className="eyebrow">A LITTLE CREDIT GOES A LONG WAY</span>
-        <Heading>Your duo. Your resolution.</Heading>
+        <span className="eyebrow">03 / PICK YOUR PACK</span>
+        <Heading>A little credit. A lot of character.</Heading>
         <p>One-time credit packs. No subscriptions. No expiry.</p>
         <span className="status-note">
           {mock

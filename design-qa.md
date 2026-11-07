@@ -1,8 +1,14 @@
-# Design QA — video studio update, 2026-11-07
+# Design QA — approved Duo Studio implementation, 2026-11-08
 
 final result: passed
 
-## Target and scope
+## Current implementation
+
+The approved source is `designs/duo-studio/project/Main.dc.html`. The homepage now implements its paired-video hero, lime and charcoal palette, paired upload cards, settings panel, horizontal scene cards and compact pricing columns. Existing FAQ, product logo, legal links and functioning controls are retained. Desktop 1440px, tablet 768px and mobile 390px browser checks passed without horizontal overflow or page errors. The actual DOM contains exactly one canonical: `https://smalltownboyai.one/`. Production build and type checking passed. Screenshots: `docs/screenshots/duo-desktop.png` and `docs/screenshots/duo-mobile.png`.
+
+## Previous comparison record
+
+### Target and scope
 
 The four competitor screenshots supplied by the user are the target for structure: large headline with live video, paired uploads with a right settings panel, a preview-and-select template dialog, and portrait video cards. This is an adaptation to the existing lime/charcoal brand, two available pet templates and 480p / 768p / 1080p pricing. It does not add unimplemented human mode, 24 trends, or claim competitor footage is our generated output.
 

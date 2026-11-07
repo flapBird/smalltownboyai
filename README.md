@@ -153,4 +153,4 @@ npx wrangler deploy --config wrangler.jobs.jsonc --dry-run
 
 ## 整页设计方案
 
-`designs/duo-studio/project/` 保存 Claude Design 可编辑首页方案，包含首屏、双图创作区、模板展示与套餐。它是独立设计草案，尚未替换生产页面；画布结构检查通过，未进行渲染验收。
+`designs/duo-studio/project/` 保存 Claude Design 可编辑首页方案，包含首屏、双图创作区、模板展示与套餐。首页代码已按该方案实现：双视频首屏、双图操作区、横向模板卡和紧凑套餐区；保留真实业务交互与 FAQ。画布保留为可编辑设计来源。首页 canonical 显式输出 `https://smalltownboyai.one/`，避免框架 metadata 格式化移除根路径斜杠。
