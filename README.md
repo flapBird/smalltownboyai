@@ -8,7 +8,9 @@
 
 ## 当前状态
 
-项目已完成本地 MVP、Mock 业务验证及 Cloudflare Workers 部署预检，尚未完成云端部署与验收。上方地址是项目配置的生产域名。
+项目已完成本地 MVP 和 Mock 业务验证；2026-11-06 已核对云端 Web / Jobs Worker、D1、私有 R2 与 Cron 配置存在，真实业务仍待验收。上方地址是项目配置的生产域名。
+
+下一步方案为 H3 Video Edit、14 秒和双模板选择，**尚未接入**；当前实现仍为 Seedance 2.5、21 秒和单个固定模板。最新待办见 [执行清单](docs/deployment.md#最新执行清单h3--14-秒待实施)。
 
 真实支付与 AI 生成默认关闭；Google OAuth、Waffo、WaveSpeed、Cloudflare 资源及授权参考视频仍需配置和联调。首页使用明确标注的 AI 概念图；本地 Mock 输出为 480 × 854、3 秒、无音轨的 H.264 测试视频。
 
@@ -70,7 +72,7 @@ Mock 流程没有真实扣款或 AI 请求。模拟登录、模拟支付和管�
 | AI 生成     | `GENERATION_ENABLED`、`WAVESPEED_API_KEY`、`VERIFIED_RESOLUTIONS`                                                         |
 | 素材与媒体  | `REFERENCE_VIDEO_URL`、`REFERENCE_LICENSE_CONFIRMED`、`MEDIA_SIGNING_SECRET`、`OUTPUT_HOSTS`                              |
 
-启用真实生成前，需要有权使用的 **21 秒、9:16、已移除音轨的 MP4 参考视频**，并逐一验证输出规格。支付、参考视频授权、模型输出与生产密钥的完整要求见 [配置与部署](docs/deployment.md)。
+启用真实生成前，先完成 H3 / 14 秒迁移并逐一验证模板及输出规格。准备有权使用的 **14 秒、9:16 MP4 模板**；可保留有权使用的配乐，不再统一要求去除音轨。支付、参考视频授权、模型输出与生产密钥的完整要求见 [配置与部署](docs/deployment.md)。
 
 ## Cloudflare Workers 部署
 
