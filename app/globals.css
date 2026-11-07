@@ -3044,3 +3044,46 @@ td {
     gap: 26px;
   }
 }
+
+.studio-login {
+  max-width: 400px;
+  padding: 32px;
+  text-align: center;
+  border-radius: 20px;
+}
+.studio-login .login-brand {
+  margin-bottom: 18px;
+}
+.studio-login h1 {
+  font-size: 28px;
+  line-height: 1.2;
+  margin: 0;
+  letter-spacing: -0.6px;
+}
+.studio-login .login-subtitle {
+  margin: 10px 0 24px;
+  color: #bfc6b8;
+  font-size: 14px;
+}
+.studio-login .button {
+  margin-top: 0;
+}
+.studio-login > .status-note {
+  font-size: 12px;
+  margin: 12px 0 18px;
+}
+.studio-login > .fineprint {
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 24px 0 0;
+  color: #bfc6b8;
+}
+.studio-login > .error {
+  text-align: left;
+  font-size: 13px;
+}
+@media (max-width: 560px) {
+  .studio-login {
+    padding: 28px 22px;
+  }
+}

@@ -1,6 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "smalltownboyai",
+	"keep_vars": true,
 	"main": "vinext/server/app-router-entry",
 	"compatibility_date": "2026-10-01",
 	"compatibility_flags": [
@@ -37,6 +38,7 @@
 		"APP_ORIGIN": "https://smalltownboyai.one",
 		"APP_MODE": "production",
 		"GENERATION_ENABLED": "false",
+		"TEMPLATE_PREVIEWS_ENABLED": "true",
 		"PAYMENTS_ENABLED": "false",
 		"WAFFO_ENVIRONMENT": "test",
 	},

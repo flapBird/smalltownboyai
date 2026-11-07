@@ -39,6 +39,17 @@ export function verifiedTemplates(e: Pick<Bindings, "VERIFIED_TEMPLATES">) {
   const ids = (e.VERIFIED_TEMPLATES || "").split(",").map((id) => id.trim());
   return TEMPLATES.filter((t) => ids.includes(t.id));
 }
+export function templatePreviewsEnabled(
+  e: Pick<
+    Bindings,
+    "TEMPLATE_PREVIEWS_ENABLED" | "REFERENCE_LICENSE_CONFIRMED"
+  >,
+) {
+  return (
+    e.TEMPLATE_PREVIEWS_ENABLED === "true" ||
+    e.REFERENCE_LICENSE_CONFIRMED === "true"
+  );
+}
 export async function publicTemplates(
   e: Bindings,
   mock: boolean,
@@ -52,7 +63,7 @@ export async function publicTemplates(
         ? localSource?.etag === t.etag
           ? "template"
           : "demo"
-        : e.REFERENCE_LICENSE_CONFIRMED === "true"
+        : templatePreviewsEnabled(e)
           ? "template"
           : "unavailable";
       return {
@@ -64,7 +75,7 @@ export async function publicTemplates(
         previewKind,
         available: mock || verified.some((t) => t.id === id),
         previewUrl:
-          mock || e.REFERENCE_LICENSE_CONFIRMED === "true"
+          mock || templatePreviewsEnabled(e)
             ? `/api/templates/${id}/preview`
             : null,
       };

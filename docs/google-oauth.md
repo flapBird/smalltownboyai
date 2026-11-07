@@ -67,3 +67,7 @@ PAYMENTS_ENABLED=false
 本地回归已验证 Better Auth 生成 Google 授权 URL、正确回调 URI 和取消授权回跳；使用的是虚拟凭据，没有代表真实账户完成 Google 授权。完整真实登录必须在你创建客户端并配置凭据后验收。
 
 参考：[Better Auth Google](https://better-auth.com/docs/authentication/google)、[Google Web OAuth](https://developers.google.com/identity/protocols/oauth2/web-server)、[Google 品牌/目标对象/Scope 配置](https://developers.google.com/workspace/guides/configure-oauth-consent)。
+
+2026-11-08 本轮首次线上排查：公开配置 `google=false`；Web Worker 已有 `BETTER_AUTH_SECRET` 和 `GOOGLE_CLIENT_SECRET`，缺少 `GOOGLE_CLIENT_ID`。需在 Web Worker 运行时配置补齐同一 OAuth 客户端的 ID，再验收真实登录。游客访问 `/api/me` 返回 401 是预期状态，与模板预览是否开放无关。
+
+用户随后已补齐 Client ID，并已跳转到 Google 账号选择页；完整 Google 授权回调仍需实际验收。Web Wrangler 配置启用 `keep_vars`，避免后续 Git 部署删除控制台添加的普通运行时变量；配置文件中明确声明的同名值仍以代码为准。

@@ -20,6 +20,7 @@ export interface Bindings {
   MERCHANT_APPROVED?: string;
   VERIFIED_TEMPLATES?: string;
   REFERENCE_LICENSE_CONFIRMED?: string;
+  TEMPLATE_PREVIEWS_ENABLED?: string;
   VERIFIED_RESOLUTIONS?: string;
   MEDIA_SIGNING_SECRET?: string;
   OUTPUT_HOSTS?: string;

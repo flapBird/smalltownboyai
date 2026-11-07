@@ -76,14 +76,10 @@ export function Login() {
   return (
     <div className="login-box studio-login">
       <a href="/" className="login-brand">
-        <img src="/icon.svg" alt="Smalltown Boy AI" width={52} height={52} />
+        <img src="/icon.svg" alt="Smalltown Boy AI" width={40} height={40} />
       </a>
-      <span className="eyebrow">WELCOME TO THE DANCE FLOOR</span>
-      <h1 style={{ marginTop: 18 }}>Your duo awaits.</h1>
-      <p>
-        Sign in to save your videos, manage credits and pick up where you left
-        off.
-      </p>
+      <h1>Sign in</h1>
+      <p className="login-subtitle">Create and save your pet videos.</p>
       <Button
         variant="outline"
         disabled={busy || !cfg?.google}
@@ -104,7 +100,7 @@ export function Login() {
         <p className="status-note">
           {cfg.mock
             ? "Google sign-in isn’t connected locally yet. You can try the demo below."
-            : "Google sign-in is not available yet. Please check back soon."}
+            : "Sign-in is temporarily unavailable. Please try again later."}
         </p>
       )}
       {cfg?.mock && (

@@ -947,3 +947,57 @@ describe("Google OAuth configuration and start flow", () => {
     expect(cancelled.headers.get("location")).toContain("error=access_denied");
   });
 });
+
+describe("Public template preview configuration", () => {
+  it("allows preview metadata independently of paid generation while preserving source protection", async () => {
+    const env = {
+      ...e,
+      APP_MODE: "production",
+      TEMPLATE_PREVIEWS_ENABLED: "true",
+      GENERATION_ENABLED: "false",
+      REFERENCE_LICENSE_CONFIRMED: "false",
+    };
+    const config = await handle(
+      new Request("http://localhost/api/config"),
+      env,
+    );
+    expect(await config.json()).toMatchObject({
+      generation: false,
+      templates: [
+        {
+          previewUrl: "/api/templates/living-room/preview",
+          previewKind: "template",
+        },
+        {
+          previewUrl: "/api/templates/red-fence/preview",
+          previewKind: "template",
+        },
+      ],
+    });
+    expect(
+      (
+        await handle(
+          new Request("http://localhost/api/templates/living-room/source"),
+          env,
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await handle(
+          new Request("http://localhost/api/templates/not-allowed/preview"),
+          env,
+        )
+      ).status,
+    ).toBe(404);
+    await e.MEDIA.put(TEMPLATES[0].objectKey, new Uint8Array([1, 2, 3]));
+    expect(
+      (
+        await handle(
+          new Request("http://localhost/api/templates/living-room/preview"),
+          env,
+        )
+      ).status,
+    ).toBe(409);
+  });
+});

@@ -70,7 +70,7 @@ Mock 流程没有真实扣款或 AI 请求。模拟登录、模拟支付和管�
 | Google 登录 | `BETTER_AUTH_SECRET`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`                                                          |
 | 支付        | `PAYMENTS_ENABLED`、`WAFFO_ENVIRONMENT`、`WAFFO_MERCHANT_ID`、`WAFFO_PRIVATE_KEY`、`WAFFO_PRODUCT_*`、`MERCHANT_APPROVED` |
 | AI 生成     | `GENERATION_ENABLED`、`WAVESPEED_API_KEY`、`VERIFIED_RESOLUTIONS`                                                         |
-| 素材与媒体  | `VERIFIED_TEMPLATES`、`REFERENCE_LICENSE_CONFIRMED`、`MEDIA_SIGNING_SECRET`、`OUTPUT_HOSTS`                               |
+| 素材与媒体  | `TEMPLATE_PREVIEWS_ENABLED`、`VERIFIED_TEMPLATES`、`REFERENCE_LICENSE_CONFIRMED`、`MEDIA_SIGNING_SECRET`、`OUTPUT_HOSTS`  |
 
 启用真实生成前，逐一验证 H3 / 14 秒模板及输出规格。准备有权使用的 **14 秒、9:16 MP4 模板**；可保留有权使用的配乐，不再统一要求去除音轨。支付、参考视频授权、模型输出与生产密钥的完整要求见 [配置与部署](docs/deployment.md)。
 

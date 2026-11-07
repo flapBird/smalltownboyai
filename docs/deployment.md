@@ -79,7 +79,8 @@ Web Worker 需要 `WAFFO_MERCHANT_ID`、`WAFFO_PRIVATE_KEY`、`WAFFO_PRODUCT_LIT
 
 Web Worker 需要 `WAVESPEED_API_KEY`、`MEDIA_SIGNING_SECRET`，不再读取 `REFERENCE_VIDEO_URL`。R2 保持私有，不开启整个桶的公开访问。
 
-- `REFERENCE_LICENSE_CONFIRMED=true`：在确认两套白名单模板的画面与配乐可使用后设置。**此配置也会开放两套模板的 `/api/templates/:id/preview` 预览接口**，只返回白名单源片，不允许任意 R2 对象键。未确认时前端显示预览待开放；本地 Mock 若存在 ETag 匹配的本地模板则预览源片；否则使用明确标注的 3 秒测试动画。
+- `TEMPLATE_PREVIEWS_ENABLED=true`：发布两套已选定模板的首页/选择器预览，仓库 Web Worker 配置已开启；只开放白名单 `/api/templates/:id/preview`，仍验证 ETag，不开放任意 R2 键、用户上传或私人成片。与付费生成开关独立。
+- `REFERENCE_LICENSE_CONFIRMED=true`：在确认模板可用于真实生成后设置，仍是付费生成的必要条件；兼容旧配置，也可启用模板预览。两项均关闭时前端显示预览待开放。本地 Mock 有 ETag 匹配的模板时预览源片，否则播放明确标注的测试动画。
 - `VERIFIED_TEMPLATES=living-room,red-fence`：只填已通过真实测试的模板 ID，可先仅启用一套。任务提交、签名源访问均检查该白名单。修改模板文件会导致 ETag 不匹配并阻止使用；换素材应使用新对象键、更新模板版本及 ETag、重新验证，不要覆盖已发布版本。
 - `VERIFIED_RESOLUTIONS=480p,768p,1080p`：只填已验证规格，旧值 `720p` 会被忽略。支持能力不代表三档都已通过测试。
 - `GENERATION_ENABLED=true`：只有凭据、许可、模板和画质配置齐全才可提交真实请求；本轮保持关闭。供应商必须能通过站点域名访问短期签名链接，Cloudflare 后台地址不能当作视频 URL。实测排队取件时间应在签名期限内。

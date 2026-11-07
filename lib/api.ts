@@ -24,6 +24,7 @@ import { WaveSpeed } from "./providers/wavespeed";
 import {
   getTemplate,
   publicTemplates,
+  templatePreviewsEnabled,
   verifiedTemplates,
   signedTemplateURL,
   validTemplateSignature,
@@ -167,7 +168,7 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
             false,
             r.headers.get("range"),
           );
-        if (!mock && e.REFERENCE_LICENSE_CONFIRMED !== "true")
+        if (!mock && !templatePreviewsEnabled(e))
           throw new AppError(404, "Preview unavailable.");
       } else if (parts[2] === "source") {
         if (
