@@ -150,3 +150,7 @@ npx wrangler deploy --config wrangler.jobs.jsonc --dry-run
 - [视觉验收](design-qa.md)
 
 项目当前没有 `llms.txt`；功能与部署信息以本 README、实现代码和上述文档为准。
+
+## 整页设计方案
+
+`designs/duo-studio/project/` 保存 Claude Design 可编辑首页方案，包含首屏、双图创作区、模板展示与套餐。它是独立设计草案，尚未替换生产页面；画布结构检查通过，未进行渲染验收。

@@ -1,0 +1,27 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-07T14:10:31.251370+00:00"
+  },
+  "title": "Smalltown \u2014 Duo Studio",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 2460,
+      "expand": "fill",
+      "title": "Homepage \u00b7 Studio direction"
+    }
+  },
+  "order": [
+    "Main.dc.html"
+  ],
+  "notes": {},
+  "designSystems": []
+}
