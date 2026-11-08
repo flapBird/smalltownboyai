@@ -5,7 +5,7 @@ import { Play, Pause, Volume2, VolumeX, Film, RotateCcw } from "lucide-react";
 export function PreviewVideo({
   src,
   label,
-  badge = "TEMPLATE PREVIEW",
+  badge,
   autoPlay = false,
 }: {
   src?: string | null;
@@ -77,7 +77,7 @@ export function PreviewVideo({
           )}
         </div>
       )}
-      <span className="video-badge">{badge}</span>
+      {badge && <span className="video-badge">{badge}</span>}
       {src && !failed && (
         <div className="video-controls">
           <button

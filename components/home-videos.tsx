@@ -47,7 +47,7 @@ export function HomeVideos({ hero = false }: { hero?: boolean }) {
               badge={
                 templates[0]?.previewKind === "demo"
                   ? "LOCAL TEST CLIP"
-                  : "TEMPLATE PREVIEW"
+                  : undefined
               }
             />
           </div>
@@ -59,7 +59,7 @@ export function HomeVideos({ hero = false }: { hero?: boolean }) {
               badge={
                 templates[1]?.previewKind === "demo"
                   ? "LOCAL TEST CLIP"
-                  : "SOURCE TEMPLATE"
+                  : undefined
               }
             />
             <p>

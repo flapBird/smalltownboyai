@@ -98,3 +98,9 @@
 AUP 增加 CSAM/儿童不安全内容及 NCII 专项零容忍条款。实际生成提示词改走 Waffo scanPrompt（semantic=enforce，仅allow继续）；停止提交/轮询 SeeAPI 文字检查，保留媒体检测。后台要求管理员角色、ADMIN_EMAILS 白名单及 ADMIN_PASSWORD 解锁；凭据绑定用户，HttpOnly、SameSite、HTTPS下Secure，30分钟过期。媒体的管理员跨用户访问同样检查权限。未配置时默认拒绝。
 
 验证：72项模拟测试、TypeScript、生产构建与diff检查通过。尚未部署或调用真实扫描接口；未设置生产密码。项目无llms.txt，已同步README、隐私政策及部署说明。
+
+## 2026-11-08：后台无法访问与首页标签
+
+线上核实 ADMIN_EMAILS、ADMIN_PASSWORD Secret 和目标账号 admin 角色均存在；D1 仅执行到0001，缺少后台列表读取的 admin_credit_grants 及 moderation_checks。已对确认绑定的生产 D1 执行0002–0006迁移并复查迁移记录、新表和套餐价格。未更改账号角色/密码，未发放积分。用户实际密码解锁后的完整访问需用户重试确认。
+
+代码新增后台缺迁移的明确503提示；首页真实模板视频不再显示 TEMPLATE PREVIEW / SOURCE TEMPLATE 覆盖标签，PreviewVideo 未传标签时不渲染；本地测试素材标签保留。72项测试、类型检查、生产构建和diff检查通过。本轮前端代码未部署或推送；无llms.txt，已检查。

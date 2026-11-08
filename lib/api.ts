@@ -583,6 +583,14 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
         return json(await grantCredits(e.DB, u.id, await body(r)));
       }
       if (r.method === "GET" && path === "admin") {
+        const required = await e.DB.prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('admin_credit_grants','moderation_checks')",
+        ).all();
+        if (required.results.length !== 2)
+          throw new AppError(
+            503,
+            "Administrator database setup is incomplete. Apply pending D1 migrations before opening the workspace.",
+          );
         const tables = [
           "user",
           "payment_orders",
