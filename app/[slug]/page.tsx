@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Login, PricingPage, Checkout } from "@/components/account";
-import { LEGAL } from "@/lib/legal";
+import { LEGAL, LEGAL_UPDATED_AT } from "@/lib/legal";
 export async function generateMetadata({
   params,
 }: {
@@ -38,6 +38,10 @@ export default async function Page({
         <article className="prose">
           <span className="eyebrow">SMALLTOWN BOY AI</span>
           <h1 style={{ marginTop: 18 }}>{legal.title}</h1>
+          <p>
+            Last updated:{" "}
+            <time dateTime={LEGAL_UPDATED_AT}>{LEGAL_UPDATED_AT}</time>
+          </p>
           <p>{legal.intro}</p>
           {legal.sections.map(([title, content]) => (
             <section key={title}>
