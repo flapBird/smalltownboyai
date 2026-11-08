@@ -148,7 +148,7 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
       return await auth(e).handler(r);
     }
     if (r.method === "POST" && path === "webhooks/waffo") {
-      if (!e.WAFFO_MERCHANT_ID)
+      if (!e.WAFFO_MERCHANT_ID || !e.WAFFO_STORE_ID)
         return json({ error: "Payment service is not configured." }, 503);
       const raw = await r.text();
       if (raw.length > 65536) throw new AppError(413, "Webhook too large.");
@@ -162,7 +162,12 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
       } catch {
         throw new AppError(400, "Invalid webhook signature.");
       }
-      await processPaymentEvent(e.DB, event, e.WAFFO_ENVIRONMENT || "test");
+      await processPaymentEvent(
+        e.DB,
+        event,
+        e.WAFFO_ENVIRONMENT || "test",
+        e.WAFFO_STORE_ID,
+      );
       return json({ received: true });
     }
     if (r.method === "GET" && path === "config")

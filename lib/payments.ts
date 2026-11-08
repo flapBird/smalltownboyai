@@ -95,7 +95,14 @@ export async function processPaymentEvent(
   db: D1Database,
   event: WebhookEvent<WebhookEventData>,
   expectedMode: string,
+  expectedStore?: string,
 ) {
+  if (
+    !event ||
+    !event.data ||
+    (expectedStore && event.storeId !== expectedStore)
+  )
+    throw new AppError(400, "Payment store or payload mismatch.");
   if (event.mode !== expectedMode)
     throw new AppError(400, "Payment environment mismatch.");
   if (
@@ -133,6 +140,8 @@ export async function processPaymentEvent(
   )
     throw new AppError(422, "Order ownership or currency mismatch.");
   if (event.eventType === "refund.failed") {
+    if (d.refundStatus !== "failed")
+      throw new AppError(422, "Refund failure not confirmed.");
     await db
       .prepare("INSERT OR IGNORE INTO payment_events VALUES (?,?,?,?)")
       .bind(event.id, order.id, event.eventType, Date.now())
@@ -167,7 +176,13 @@ export async function processPaymentEvent(
         "Partial or unconfirmed refund requires manual reconciliation.",
       );
     const subtotal = cents(d.originalPayment?.subtotal);
-    if (subtotal !== order.cents)
+    const tax = cents(d.originalPayment?.taxAmount),
+      total = cents(d.originalPayment?.total);
+    if (
+      subtotal !== order.cents ||
+      total !== subtotal + tax ||
+      cents(d.originalChargedAmount) !== total
+    )
       throw new AppError(422, "Original payment mismatch.");
   }
   await applyPayment(db, order, {

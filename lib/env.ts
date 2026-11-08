@@ -14,6 +14,7 @@ export interface Bindings {
   SEEAPI_API_KEY?: string;
   SEEAPI_DAILY_CHECK_LIMIT?: string;
   WAFFO_MERCHANT_ID?: string;
+  WAFFO_STORE_ID?: string;
   WAFFO_PRIVATE_KEY?: string;
   WAFFO_ENVIRONMENT?: "test" | "prod";
   WAFFO_PRODUCT_LITE?: string;

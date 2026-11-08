@@ -199,8 +199,8 @@ export async function applyPayment(
     db
       .prepare(
         refund
-          ? `UPDATE payment_orders SET status='refunded',provider_id=COALESCE(provider_id,?) WHERE id=? AND status IN ('pending','paid')`
-          : `UPDATE payment_orders SET status='paid',provider_id=COALESCE(provider_id,?) WHERE id=? AND status='pending'`,
+          ? `UPDATE payment_orders SET status=CASE WHEN status IN ('pending','paid') THEN 'refunded' ELSE status END,provider_id=? WHERE id=?`
+          : `UPDATE payment_orders SET status=CASE WHEN status='pending' THEN 'paid' ELSE status END,provider_id=? WHERE id=?`,
       )
       .bind(event.providerId, order.id),
     db

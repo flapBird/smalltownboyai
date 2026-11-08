@@ -1208,3 +1208,139 @@ it("blocks output downloads and administrator approval without safety approval",
     ).status,
   ).toBe(404);
 });
+
+describe("payment webhook fulfillment and refund regression", () => {
+  function event(o: OrderRow, type = "order.completed") {
+    return {
+      id: crypto.randomUUID(),
+      eventId: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      storeId: "expected-store",
+      storeName: "Test",
+      mode: "test" as const,
+      eventType: type,
+      data: {
+        orderId: "provider-" + o.id,
+        orderMerchantExternalId: o.id,
+        merchantProvidedBuyerIdentity: o.user_id,
+        buyerEmail: "test@example.com",
+        currency: "USD",
+        productName: "Lite",
+        orderStatus: "completed",
+        paymentStatus: "succeeded",
+        orderMetadata: { productId: o.product_id },
+        productMetadata: { packageId: o.package_id },
+        amount: "9.79",
+        taxAmount: "0.89",
+        chargedAmount: "9.79",
+        listPrice: { subtotal: "8.90", taxAmount: "0.89", total: "9.79" },
+        refundStatus: type === "refund.failed" ? "failed" : "succeeded",
+        refundedAmount: "9.79",
+        originalChargedAmount: "9.79",
+        originalPayment: { subtotal: "8.90", taxAmount: "0.89", total: "9.79" },
+      },
+    };
+  }
+  it("fulfills once, keeps failed refunds unchanged, reverses successful refunds once", async () => {
+    const u = await user(0, 0),
+      o = await order(u.id),
+      paid = event(o);
+    await expect(
+      processPaymentEvent(db, paid, "test", "other-store"),
+    ).rejects.toThrow("store");
+    await Promise.all([
+      processPaymentEvent(db, paid, "test", "expected-store"),
+      processPaymentEvent(
+        db,
+        { ...paid, id: crypto.randomUUID() },
+        "test",
+        "expected-store",
+      ),
+    ]);
+    expect(await wallet(u.id)).toMatchObject({ balance: 100, tier: 1 });
+    await processPaymentEvent(
+      db,
+      event(o, "refund.failed"),
+      "test",
+      "expected-store",
+    );
+    expect(await wallet(u.id)).toMatchObject({ balance: 100, tier: 1 });
+    const refund = event(o, "refund.succeeded");
+    await Promise.all([
+      processPaymentEvent(db, refund, "test", "expected-store"),
+      processPaymentEvent(
+        db,
+        { ...refund, id: crypto.randomUUID() },
+        "test",
+        "expected-store",
+      ),
+    ]);
+    await processPaymentEvent(
+      db,
+      { ...paid, id: crypto.randomUUID() },
+      "test",
+      "expected-store",
+    );
+    expect(await wallet(u.id)).toMatchObject({ balance: 0, tier: 0 });
+    const rows = await db
+      .prepare(
+        "SELECT kind FROM credit_transactions WHERE user_id=? ORDER BY created_at",
+      )
+      .bind(u.id)
+      .all();
+    expect(rows.results.map((r) => r.kind)).toEqual(["purchase", "refund"]);
+  });
+  it("handles refund-before-payment and rejects partial or inconsistent refund amounts", async () => {
+    const u = await user(0, 0),
+      o = await order(u.id),
+      refund = event(o, "refund.succeeded");
+    for (const data of [
+      { refundedAmount: "1.00" },
+      { originalChargedAmount: "1.00", refundedAmount: "1.00" },
+      {
+        originalPayment: { subtotal: "8.90", taxAmount: "0.00", total: "9.79" },
+      },
+    ]) {
+      await expect(
+        processPaymentEvent(
+          db,
+          { ...refund, data: { ...refund.data, ...data } },
+          "test",
+          "expected-store",
+        ),
+      ).rejects.toThrow();
+    }
+    await processPaymentEvent(db, refund, "test", "expected-store");
+    await processPaymentEvent(db, event(o), "test", "expected-store");
+    expect(await wallet(u.id)).toMatchObject({ balance: 0, tier: 0 });
+  });
+  it("rolls back competing event and provider bindings atomically", async () => {
+    const u = await user(0, 0),
+      a = await order(u.id),
+      b = await order(u.id),
+      id = crypto.randomUUID();
+    const results = await Promise.allSettled([
+      applyPayment(db, a, {
+        id,
+        type: "order.completed",
+        providerId: "a-" + a.id,
+      }),
+      applyPayment(db, b, {
+        id,
+        type: "order.completed",
+        providerId: "b-" + b.id,
+      }),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect((await wallet(u.id))?.balance).toBe(100);
+    const accepted = results[0].status === "fulfilled" ? a : b;
+    await expect(
+      applyPayment(db, accepted, {
+        id: crypto.randomUUID(),
+        type: "refund.succeeded",
+        providerId: "wrong-provider",
+      }),
+    ).rejects.toThrow();
+    expect((await wallet(u.id))?.balance).toBe(100);
+  });
+});

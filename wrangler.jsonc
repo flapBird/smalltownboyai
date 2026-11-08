@@ -41,6 +41,7 @@
 		"TEMPLATE_PREVIEWS_ENABLED": "true",
 		"PAYMENTS_ENABLED": "false",
 		"WAFFO_ENVIRONMENT": "test",
+		"WAFFO_STORE_ID": "STO_3Gn9gFKccKSVnOjhUU1lYW",
 	},
 	"observability": {
 		"enabled": true
