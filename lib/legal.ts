@@ -16,6 +16,10 @@ export const LEGAL: Record<
         "Uploaded photos are stored in a private Cloudflare R2 bucket. Authorized requests and short-lived signed links provide access. WaveSpeed receives the images and a licensed reference clip when live generation is enabled. The current local preview does not send your photos to WaveSpeed.",
       ],
       [
+        "Safety checks",
+        "For live generation, SeeAPI receives the generation prompt, both reference photos, the template video and the generated video for automated content checks. Video checks sample visual frames; they do not check audio or every frame and cannot guarantee safety. Results remain private until automated checks and our output review pass. SeeAPI states that stored files, task information and moderation results have no scheduled automatic expiry; request logs are retained for 60 days. Expiring our links does not delete provider copies. Contact support@smalltownboyai.one for a deletion request, including the relevant task ID. Local demo mode does not submit media to SeeAPI.",
+      ],
+      [
         "Storage and deletion",
         "Unattached uploads are eligible for cleanup after 24 hours by the scheduled worker. Photos attached to tasks are retained with those tasks. You can delete completed videos; contact support to remove associated source photos or your account. Browser drafts are stored locally to restore uploads after sign-in; removing a photo clears its draft.",
       ],

@@ -1,3 +1,9 @@
+import {
+  moderateInputs,
+  moderateOutput,
+  approvedOutputEtag,
+  resolveModerationMedia,
+} from "./moderation";
 import { z } from "zod";
 import { auth, identity, requireUser, sameOrigin, AppError } from "./auth";
 import {
@@ -19,7 +25,7 @@ import {
   verifyPaymentEvent,
   processPaymentEvent,
 } from "./payments";
-import { imageInfo, validSignature, signedMediaURL } from "./media";
+import { imageInfo, validSignature } from "./media";
 import { WaveSpeed } from "./providers/wavespeed";
 import {
   getTemplate,
@@ -122,6 +128,20 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
     const parts = url.pathname.replace(/^\/api\/?/, "").split("/");
     const path = parts.join("/");
     const mock = localMock(e, r);
+    if (
+      r.method === "GET" &&
+      parts[0] === "moderation-media" &&
+      parts.length === 2
+    ) {
+      const check = await resolveModerationMedia(e, parts[1], url);
+      return await objectResponse(
+        e,
+        check.asset_key!,
+        false,
+        r.headers.get("range"),
+        check.asset_etag!,
+      );
+    }
     if (parts[0] === "auth") {
       if (!googleConfigured(e))
         return json({ error: "Google sign-in is not configured yet." }, 503);
@@ -337,6 +357,8 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
       const info = imageInfo(bytes);
       if (
         info.mime !== file.type ||
+        !["image/jpeg", "image/png"].includes(info.mime) ||
+        info.width * info.height < 78400 ||
         info.width < 256 ||
         info.height < 256 ||
         info.width > 4096 ||
@@ -344,7 +366,7 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
       )
         throw new AppError(
           400,
-          "Use a valid JPG, PNG or WebP, 256–4096 pixels per side.",
+          "Use JPG or PNG, 256–4096 pixels per side and at least 78,400 pixels in total.",
         );
       const id = crypto.randomUUID(),
         key = "uploads/" + u.id + "/" + id;
@@ -431,6 +453,13 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
             template,
             e.MEDIA_SIGNING_SECRET!,
           );
+      const existing = await e.DB.prepare(
+        "SELECT id FROM video_tasks WHERE user_id=? AND request_key=?",
+      )
+        .bind(u.id, b.requestKey)
+        .first();
+      const checkedURLs =
+        !mock && !existing ? await moderateInputs(e, u.id, b) : null;
       const result = await reserveTask(e.DB, u.id, b, mock);
       if (result.created) {
         if (mock) {
@@ -447,16 +476,12 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
             .first();
           if (!claimed) return json(await ownedTask(e, r, result.task.id));
           try {
-            const urls = await Promise.all(
-              [b.assetA, b.assetB].map((id) =>
-                signedMediaURL(e.APP_ORIGIN, id, e.MEDIA_SIGNING_SECRET!),
-              ),
-            );
+            if (!checkedURLs) throw new Error("Missing safety approval.");
             const providerId = await new WaveSpeed(
               e.WAVESPEED_API_KEY!,
             ).submitTask({
               video: templateURL,
-              images: urls as [string, string],
+              images: checkedURLs,
               resolution: b.resolution,
               inputDuration: result.task.input_duration,
             });
@@ -514,6 +539,9 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
           t.output_key,
           url.searchParams.get("download") === "1",
           r.headers.get("range"),
+          t.provider === "wavespeed"
+            ? await approvedOutputEtag(e, t)
+            : undefined,
         );
       }
       if (r.method === "GET" && parts.length === 2) {
@@ -662,6 +690,8 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
             throw new AppError(409, "Task is not awaiting review.");
           if (b.action === "approve-output" && !t.output_key)
             throw new AppError(409, "Missing output.");
+          if (b.action === "approve-output" && t.provider === "wavespeed")
+            await moderateOutput(e, t);
           await e.DB.prepare(
             "INSERT OR IGNORE INTO admin_audit_logs VALUES (?,?,?,?,?,?)",
           )

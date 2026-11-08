@@ -176,10 +176,10 @@ export function Generator() {
     if (!file) return;
     setMessage("");
     if (
-      !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
+      !["image/jpeg", "image/png"].includes(file.type) ||
       file.size > 8 * 1024 * 1024
     ) {
-      setMessage("Choose a JPG, PNG or WebP image under 8 MB.");
+      setMessage("Choose a JPG or PNG image under 8 MB.");
       return;
     }
     try {
@@ -381,14 +381,17 @@ export function Generator() {
                       </span>
                       <strong>Drop a photo here</strong>
                       <span>or browse your files</span>
-                      <small>JPG, PNG or WebP · up to 8 MB</small>
+                      <small>
+                        JPG or PNG · up to 8 MB · 280 × 280 px recommended
+                        minimum
+                      </small>
                     </button>
                   )}
                   <input
                     id={"character-" + i}
                     className="sr-only"
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
+                    accept="image/jpeg,image/png"
                     ref={inputs[i]}
                     disabled={!!busy || !!active}
                     onChange={(e) => choose(i, e.target.files?.[0])}
@@ -483,7 +486,8 @@ export function Generator() {
             />
             <span>
               I own these photos or have permission to use them. Pets and
-              fictional nonhuman characters only.
+              fictional nonhuman characters only. Live generation uses SeeAPI
+              safety checks; see our <a href="/privacy">Privacy Policy</a>.
             </span>
           </label>
           <Button
@@ -570,7 +574,11 @@ export function Generator() {
                     ? "Test animation · 480 × 854 · 3 seconds"
                     : "Your private video is ready to download."
                   : task.status === "review"
-                    ? "Your video is awaiting content review."
+                    ? task.error_code === "SAFETY_BLOCKED"
+                      ? "Safety checks flagged this video. It remains private; contact support for review."
+                      : task.error_code === "SAFETY_UNAVAILABLE"
+                        ? "Safety checks could not finish. Your video remains private; contact support for review."
+                        : "Your video is awaiting safety checks and content review."
                     : "Your task is saved. You can check back in My Videos."}
             </p>
             <small>

@@ -200,3 +200,33 @@ export const mockSessions = sqliteTable("mock_sessions", {
   userId: text("user_id").notNull(),
   expiresAt: integer("expires_at").notNull(),
 });
+
+export const moderationChecks = sqliteTable(
+  "moderation_checks",
+  {
+    id: text("id").primaryKey(),
+    owner: text("owner").notNull(),
+    stage: text("stage").notNull(),
+    assetKey: text("asset_key"),
+    assetEtag: text("asset_etag"),
+    policy: text("policy").notNull(),
+    model: text("model").notNull(),
+    endpoint: text("endpoint").notNull(),
+    body: text("body").notNull(),
+    providerId: text("provider_id"),
+    state: text("state").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAt: integer("next_at").notNull().default(0),
+    leaseUntil: integer("lease_until").notNull().default(0),
+    deadline: integer("deadline").notNull(),
+    createdAt: integer("created_at").notNull(),
+    usage: real("usage"),
+    error: text("error"),
+  },
+  (t) => [
+    index("moderation_created").on(t.createdAt),
+    index("moderation_owner_created").on(t.owner, t.createdAt),
+    index("moderation_due").on(t.state, t.nextAt),
+    index("moderation_asset").on(t.assetKey, t.policy),
+  ],
+);

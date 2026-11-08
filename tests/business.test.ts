@@ -593,6 +593,7 @@ describe("recovery and deletion regressions", () => {
       APP_MODE: "production",
       GENERATION_ENABLED: "true",
       WAVESPEED_API_KEY: "test",
+      SEEAPI_API_KEY: "test",
       MEDIA_SIGNING_SECRET: "test",
       VERIFIED_TEMPLATES: "living-room",
       REFERENCE_LICENSE_CONFIRMED: "true",
@@ -1000,4 +1001,210 @@ describe("Public template preview configuration", () => {
       ).status,
     ).toBe(409);
   });
+});
+
+describe("durable safety gates", () => {
+  const safetyEnv = () => ({
+    ...e,
+    APP_ORIGIN: "https://smalltownboyai.one",
+    SEEAPI_API_KEY: "fake-test-key",
+    MEDIA_SIGNING_SECRET: "test-only",
+  });
+  it("persists identical body/key after a lost POST, then polls the saved ID", async () => {
+    const { ensureCheck, runCheck } = await import("../lib/moderation");
+    const owner = crypto.randomUUID(),
+      env = safetyEnv();
+    const check = await ensureCheck(env, owner, "prompt", "h3", "text", {
+      text: "Two pets dance",
+    });
+    const requests: RequestInit[] = [];
+    const lost = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      requests.push(init!);
+      throw new Error("lost response");
+    });
+    expect((await runCheck(env, check.id, lost as typeof fetch)).state).toBe(
+      "pending",
+    );
+    await db
+      .prepare("UPDATE moderation_checks SET next_at=0 WHERE id=?")
+      .bind(check.id)
+      .run();
+    const accepted = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      requests.push(init!);
+      return Response.json({
+        id: "persisted-id",
+        object: "inference",
+        provider: "seeapi",
+        model: check.model,
+        endpoint: check.endpoint,
+        status: "processing",
+        error: null,
+        result: null,
+      });
+    });
+    await Promise.all([
+      runCheck(env, check.id, accepted as typeof fetch),
+      runCheck(env, check.id, accepted as typeof fetch),
+    ]);
+    expect(accepted).toHaveBeenCalledTimes(1);
+    expect(requests[0].body).toBe(requests[1].body);
+    expect(requests[0].headers).toEqual(requests[1].headers);
+    await db
+      .prepare("UPDATE moderation_checks SET next_at=0 WHERE id=?")
+      .bind(check.id)
+      .run();
+    const poll = vi.fn(
+      async (_url: unknown, _init?: RequestInit) =>
+        new Response("", { status: 429, headers: { "Retry-After": "120" } }),
+    );
+    const pending = await runCheck(env, check.id, poll as typeof fetch);
+    expect(poll.mock.calls[0][0]).toContain("/persisted-id");
+    expect(poll.mock.calls[0][1]).toMatchObject({ method: "GET" });
+    expect(pending.next_at).toBeGreaterThan(Date.now() + 110000);
+    expect(pending.state).toBe("pending");
+  });
+  it("enforces quota atomically and closes missing-key and deadline paths", async () => {
+    const { ensureCheck, runCheck } = await import("../lib/moderation");
+    const env = safetyEnv(),
+      owner = crypto.randomUUID();
+    const results = await Promise.allSettled(
+      Array.from({ length: 6 }, (_, i) =>
+        ensureCheck(env, owner, "prompt", String(i), "text", {
+          text: "pet " + i,
+        }),
+      ),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(4);
+    const check = (
+      results.find((r) => r.status === "fulfilled") as PromiseFulfilledResult<
+        Awaited<ReturnType<typeof ensureCheck>>
+      >
+    ).value;
+    const transport = vi.fn();
+    expect(
+      (
+        await runCheck(
+          { ...env, SEEAPI_API_KEY: undefined },
+          check.id,
+          transport,
+        )
+      ).state,
+    ).toBe("pending");
+    expect(transport).not.toHaveBeenCalled();
+    await db
+      .prepare("UPDATE moderation_checks SET deadline=0 WHERE id=?")
+      .bind(check.id)
+      .run();
+    expect((await runCheck(env, check.id, transport)).state).toBe(
+      "unavailable",
+    );
+    expect(transport).not.toHaveBeenCalled();
+  });
+  it("never authorizes replaced output bytes and does not spend for insufficient balance", async () => {
+    const { ensureCheck, approvedOutputEtag, moderateInputs } =
+      await import("../lib/moderation");
+    const env = safetyEnv(),
+      u = await user(0),
+      key = "outputs/" + u.id + "/safe.mp4";
+    await expect(moderateInputs(env, u.id, input(u.assets))).rejects.toThrow(
+      "credit balance",
+    );
+    const count = await db
+      .prepare("SELECT COUNT(*) n FROM moderation_checks WHERE owner=?")
+      .bind(u.id)
+      .first<{ n: number }>();
+    expect(count?.n).toBe(0);
+    const bytes = new Uint8Array(36),
+      v = new DataView(bytes.buffer);
+    v.setUint32(0, 36);
+    bytes.set(new TextEncoder().encode("moov"), 4);
+    v.setUint32(8, 28);
+    bytes.set(new TextEncoder().encode("mvhd"), 12);
+    v.setUint32(28, 1000);
+    v.setUint32(32, 14000);
+    const obj = await e.MEDIA.put(key, bytes);
+    const c = await ensureCheck(env, u.id, "output", "job", "video", {
+      key,
+      etag: obj!.etag,
+    });
+    const t = {
+      id: "job",
+      user_id: u.id,
+      output_key: key,
+    } as import("../lib/credits").TaskRow;
+    await expect(approvedOutputEtag(env, t)).rejects.toThrow();
+    await db
+      .prepare("UPDATE moderation_checks SET state='passed' WHERE id=?")
+      .bind(c.id)
+      .run();
+    expect(await approvedOutputEtag(env, t)).toBe(obj!.etag);
+    bytes[35] = 1;
+    await e.MEDIA.put(key, bytes);
+    await expect(approvedOutputEtag(env, t)).rejects.toThrow();
+  });
+  it("migrates current package prices without changing credits", async () => {
+    const rows = await db
+      .prepare("SELECT * FROM credit_packages ORDER BY cents")
+      .all();
+    expect(rows.results).toEqual(
+      PACKAGES.map((p) => ({
+        id: p.id,
+        cents: p.cents,
+        credits: p.credits,
+        tier: p.tier,
+      })),
+    );
+  });
+});
+
+it("blocks output downloads and administrator approval without safety approval", async () => {
+  const u = await user(),
+    headers = await authenticated(u.id);
+  const { task } = await reserveTask(db, u.id, input(u.assets), false);
+  const key = "outputs/" + u.id + "/test.mp4";
+  await e.MEDIA.put(key, readFileSync("public/fixtures/mock.mp4"));
+  await db
+    .prepare("UPDATE video_tasks SET status='review', output_key=? WHERE id=?")
+    .bind(key, task.id)
+    .run();
+  expect(
+    (
+      await handle(
+        new Request("http://localhost/api/tasks/" + task.id + "/video", {
+          headers,
+        }),
+        e,
+      )
+    ).status,
+  ).toBe(404);
+  await db.prepare("UPDATE user SET role='admin' WHERE id=?").bind(u.id).run();
+  const approve = await handle(
+    new Request("http://localhost/api/admin/action", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        action: "approve-output",
+        target: task.id,
+        key: crypto.randomUUID(),
+        reason: "Test review",
+      }),
+    }),
+    e,
+  );
+  expect(approve.status).toBe(503);
+  expect(await wallet(u.id)).toMatchObject({ balance: 500, reserved: 100 });
+  await db
+    .prepare("UPDATE video_tasks SET status='completed' WHERE id=?")
+    .bind(task.id)
+    .run();
+  expect(
+    (
+      await handle(
+        new Request("http://localhost/api/tasks/" + task.id + "/video", {
+          headers,
+        }),
+        e,
+      )
+    ).status,
+  ).toBe(404);
 });

@@ -45,7 +45,7 @@ npm run jobs:deploy
 
 Web Worker 需要 `WAFFO_MERCHANT_ID`、`WAFFO_PRIVATE_KEY`、`WAFFO_PRODUCT_LITE`、`WAFFO_PRODUCT_STANDARD`、`WAFFO_PRODUCT_PRO`。先用测试环境 API 凭据，`WAFFO_ENVIRONMENT=test`，设置 `PAYMENTS_ENABLED=true` 才允许真实 SDK 测试 checkout。
 
-在 Waffo 创建三个一次性 USD 商品，价格为 4.90 / 12.90 / 24.90；对应积分为 100 / 300 / 600；商品 metadata 分别设置 `packageId=lite|standard|pro`。服务端订单 metadata 包含 `productId` 和 `packageId`。Webhook URL：`https://smalltownboyai.one/api/webhooks/waffo`，签名头 `x-waffo-signature`。
+在 Waffo 创建三个一次性 USD 商品，价格为 8.90 / 19.90 / 39.90；对应积分为 100 / 300 / 600；商品 metadata 分别设置 `packageId=lite|standard|pro`。服务端订单 metadata 包含 `productId` 和 `packageId`。Webhook URL：`https://smalltownboyai.one/api/webhooks/waffo`，签名头 `x-waffo-signature`。
 
 新价格上线前，在 Waffo 创建对应的新商品或核对商品价格，并更新三个 `WAFFO_PRODUCT_*`，不要继续使用旧金额商品。现有订单按创建时保存的金额/积分核验，迁移不会改旧订单或用户余额。定价依据见 [成本与定价](pricing.md)。
 
@@ -102,3 +102,16 @@ Jobs Worker 也必须设置 `WAVESPEED_API_KEY`；`OUTPUT_HOSTS` 填供应商实
 Google 回调；Waffo sandbox 完整付款、重发、乱序、退款；迁移后 WaveSpeed H3 已选规格与两个模板的完整 14 秒、身份与动作、耗时、实际费用和失败收费；远程 D1/R2 权限；Cron 实际执行与输出 CDN；邮箱真实可达；合法运营主体、政策文本和商户批准。当前法律页面明确处于预览状态，没有编造公司名称和地址。
 
 若 14 秒规格的真实费用不合适，保持关闭并报告，不能擅自改套餐、重复短片或伪造分辨率。模型和商户文档可更新，上线时须重新核对。
+
+## SeeAPI 内容检测与新价格（2026-11-08）
+
+1. 发布代码前先对 D1 应用 `0003`（检测记录、890/1990/3990 美分套餐价格）及 `0004`（索引）迁移；已有订单金额、积分和余额不变。先在测试环境验证，生产迁移需要单独执行。
+2. 网页 Worker `smalltownboyai` 与定时任务 Worker `smalltownboyai-jobs` 均设置 Secret `SEEAPI_API_KEY`，并配置相同的 `MEDIA_SIGNING_SECRET`。两者 `APP_ORIGIN=https://smalltownboyai.one`，连接同一 D1/R2。密钥只保存在服务端。
+3. SeeAPI 控制台单独设置该 Key 的每日额度上限。应用 `SEEAPI_DAILY_CHECK_LIMIT` 默认 100 个新检测/UTC 日（最大 1000）；每账户每日最多 30 个、同时最多 4 个待检测项。次数上限不是固定金额上限。确认 SeeAPI 当前单价与实际 `consumed_credits`，检测费用不包含在 H3 模型成本估算中。
+4. 部署网页及 jobs Worker，确认每分钟 cron 正常执行。现有 `GENERATION_ENABLED`、模型/模板验证、授权确认、人工图片审核和人工成片审核仍需满足；缺失检测密钥不会绕过检测。
+5. 新输入检测只接受 JPG/PNG ≤8 MiB、每边256–4096、总像素至少78,400。视频为可解析 MP4 ≤30秒、≤50 MiB。先核对余额/权限/素材限制，再检查实际提示词、两张图片、模板视频；全部通过才冻结积分并提交 H3。
+6. 成片写入私有 R2，检查16个采样帧，再由管理员审核交付。下载同时验证当前文件 ETag 的通过记录。检测失败/超时与违规分开处理；等待/不可用时不交付、不自动重新生成。管理员可拒绝成片并走现有幂等积分解冻，不能绕过检测批准。
+7. 持久化记录保存原始请求正文、幂等键和供应商ID，最多12次尝试/20分钟。丢失POST响应重放相同正文和键，已知ID只查询。不可用的终态交由运维核对供应商ID；不要删除记录或换键盲目重试。若需重试策略/模型变更，先查清旧任务结算，再显式升级策略版本。
+8. Waffo 需创建/核对 $8.90、$19.90、$39.90 的一次性USD商品，更新对应 `WAFFO_PRODUCT_*`。测试环境验证金额匹配、重复回调、到账及退款后再启用支付。本站代码改价不会自动修改 Waffo 后台商品。
+
+生成页和隐私政策披露 SeeAPI 的处理。视频检查只覆盖抽帧画面，不覆盖音轨或所有帧；保留人工审核。SeeAPI 文件与检测记录没有计划自动到期，删除源链接不删除其副本，应携任务ID联系支持处理删除请求。参见 [数据处理说明](https://www.seeapi.com/docs/data-handling/)。本地 Mock 不调用真实检测、支付或生成服务。

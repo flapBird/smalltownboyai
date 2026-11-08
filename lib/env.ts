@@ -11,6 +11,8 @@ export interface Bindings {
   GENERATION_ENABLED?: string;
   PAYMENTS_ENABLED?: string;
   WAVESPEED_API_KEY?: string;
+  SEEAPI_API_KEY?: string;
+  SEEAPI_DAILY_CHECK_LIMIT?: string;
   WAFFO_MERCHANT_ID?: string;
   WAFFO_PRIVATE_KEY?: string;
   WAFFO_ENVIRONMENT?: "test" | "prod";
@@ -51,6 +53,7 @@ export function liveResolutions(e: Bindings): string[] {
   if (
     e.GENERATION_ENABLED !== "true" ||
     !e.WAVESPEED_API_KEY ||
+    !e.SEEAPI_API_KEY ||
     !e.MEDIA_SIGNING_SECRET ||
     !verifiedTemplates(e).length ||
     e.REFERENCE_LICENSE_CONFIRMED !== "true"

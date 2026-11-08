@@ -7,7 +7,7 @@ export const PACKAGES = [
   {
     id: "lite",
     name: "Lite",
-    cents: 490,
+    cents: 890,
     credits: 100,
     tier: 1,
     resolution: "480p",
@@ -16,7 +16,7 @@ export const PACKAGES = [
   {
     id: "standard",
     name: "Standard",
-    cents: 1290,
+    cents: 1990,
     credits: 300,
     tier: 2,
     resolution: "768p",
@@ -25,7 +25,7 @@ export const PACKAGES = [
   {
     id: "pro",
     name: "Pro",
-    cents: 2490,
+    cents: 3990,
     credits: 600,
     tier: 3,
     resolution: "1080p",
@@ -50,7 +50,7 @@ export const FAQ = [
   ],
   [
     "Can I use my own cat or other pet photos?",
-    "Yes. Use JPG, PNG or WebP images you own or have permission to use. Each image must be under 8 MB and between 256 and 4096 pixels per side. This version is for pets and fictional nonhuman characters only.",
+    "Yes. Use JPG or PNG images you own or have permission to use. Each image must be under 8 MB and between 256 and 4096 pixels per side, with at least 78,400 pixels in total. This version is for pets and fictional nonhuman characters only.",
   ],
   [
     "How long is the video, and which resolutions are supported?",

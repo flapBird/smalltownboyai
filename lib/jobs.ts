@@ -1,3 +1,4 @@
+import { reconcileModeration } from "./moderation";
 import type { Bindings } from "./env";
 import { settleTask, type TaskRow } from "./credits";
 import { WaveSpeed } from "./providers/wavespeed";
@@ -66,6 +67,7 @@ export async function reconcile(e: Bindings) {
       const r = await new WaveSpeed(e.WAVESPEED_API_KEY).queryTask(
         t.provider_task_id,
       );
+      if (r.id !== t.provider_task_id) throw new Error("PROVIDER_ID_MISMATCH");
       if (r.status === "failed")
         await settleTask(e.DB, t.id, false, null, "PROVIDER_FAILED");
       else if (r.status === "completed" && r.url) await saveOutput(e, t, r.url);
@@ -83,6 +85,7 @@ export async function reconcile(e: Bindings) {
         .run();
     }
   }
+  await reconcileModeration(e);
   const abandoned = await e.DB.prepare(
     "SELECT id FROM video_tasks WHERE status='queued' AND updated_at<?",
   )

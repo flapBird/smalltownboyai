@@ -1,4 +1,6 @@
 import { SPECS, type Resolution } from "../catalog";
+export const H3_PROMPT =
+  "Replace the foreground character with the pet in the first reference image and the background character with the pet in the second reference image. Preserve each pet identity, the original camera rhythm, exaggerated reaction, background dance, playful interaction and final two-character dance. Nonhuman pets only. Preserve the source audio and its timing. Do not add text.";
 export const H3_MODEL = "wavespeed-ai/minimax-h3/video-edit";
 export function estimateCost(inputDuration: number, resolution: Resolution) {
   // Input rounds up; output is explicitly set to the same integer duration. Two images.
@@ -64,8 +66,7 @@ export class WaveSpeed implements VideoGenerationProvider {
           duration: i.inputDuration,
           aspect_ratio: "9:16",
           generate_audio: false,
-          prompt:
-            "Replace the foreground character with the pet in the first reference image and the background character with the pet in the second reference image. Preserve each pet identity, the original camera rhythm, exaggerated reaction, background dance, playful interaction and final two-character dance. Nonhuman pets only. Preserve the source audio and its timing. Do not add text.",
+          prompt: H3_PROMPT,
         }),
       },
     );

@@ -15,6 +15,9 @@ WAFFO_PRODUCT_STANDARD=
 WAFFO_PRODUCT_PRO=
 MERCHANT_APPROVED=false
 WAVESPEED_API_KEY=
+# Set the same key and signing secret on the web and jobs Workers.
+SEEAPI_API_KEY=
+SEEAPI_DAILY_CHECK_LIMIT=100
 # Uploaded templates are private R2 objects; cleared template audio is preserved.
 # Only enable IDs after real 14-second two-pet tests, e.g. living-room,red-fence:
 VERIFIED_TEMPLATES=
