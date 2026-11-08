@@ -62,7 +62,7 @@ export const LEGAL: Record<
       ],
       [
         "Credits",
-        "Credit packs are one-time purchases. Credits do not expire through the passage of time and balances accumulate. Access to credits can be restricted during a violation investigation; the account-termination rules below explain how remaining credits are handled. Resolution access comes from your highest eligible purchase and can change after refunds or chargebacks. No free full video generation is offered. Local test credits have no monetary value.",
+        "Credit packs are one-time purchases. Credits do not expire through the passage of time and balances accumulate. Access to credits can be restricted during a violation investigation; the account-termination rules below explain how remaining credits are handled. Resolution access comes from your highest eligible purchase and can change after refunds or chargebacks. No free full video generation is offered to new accounts. Local demo credits and complimentary administrator grants are not purchases and have no cash-refund value.",
       ],
       [
         "Your responsibilities and breaches",

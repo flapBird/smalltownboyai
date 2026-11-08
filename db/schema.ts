@@ -230,3 +230,21 @@ export const moderationChecks = sqliteTable(
     index("moderation_asset").on(t.assetKey, t.policy),
   ],
 );
+
+export const adminCreditGrants = sqliteTable(
+  "admin_credit_grants",
+  {
+    id: text("id").primaryKey(),
+    adminId: text("admin_id")
+      .notNull()
+      .references(() => user.id),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
+    credits: integer("credits").notNull(),
+    tier: integer("tier").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("grants_user").on(t.userId)],
+);

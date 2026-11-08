@@ -43,6 +43,13 @@
       "when": 1794128422806,
       "tag": "0005_payment_webhook_guards",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794132056050,
+      "tag": "0006_happy_dazzler",
+      "breakpoints": true
     }
   ]
 }

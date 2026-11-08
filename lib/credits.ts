@@ -222,8 +222,8 @@ export async function applyPayment(
       ),
     db
       .prepare(
-        `UPDATE user_wallets SET tier=COALESCE((SELECT MAX(tier) FROM payment_orders WHERE user_id=? AND status='paid'),0) WHERE user_id=?`,
+        `UPDATE user_wallets SET tier=MAX(COALESCE((SELECT MAX(tier) FROM payment_orders WHERE user_id=? AND status='paid'),0),COALESCE((SELECT MAX(tier) FROM admin_credit_grants WHERE user_id=?),0)) WHERE user_id=?`,
       )
-      .bind(order.user_id, order.user_id),
+      .bind(order.user_id, order.user_id, order.user_id),
   ]);
 }

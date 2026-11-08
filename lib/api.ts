@@ -1,3 +1,4 @@
+import { grantCredits } from "./admin-credits";
 import {
   moderateInputs,
   moderateOutput,
@@ -560,6 +561,10 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
     if (parts[0] === "admin") {
       if (u.role !== "admin")
         throw new AppError(403, "Administrator access required.");
+      if (r.method === "POST" && path === "admin/credits") {
+        await rateLimit(e.DB, "admin-credit:" + u.id, 10, 60);
+        return json(await grantCredits(e.DB, u.id, await body(r)));
+      }
       if (r.method === "GET" && path === "admin") {
         const tables = [
           "user",
@@ -568,6 +573,7 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
           "video_tasks",
           "media_assets",
           "admin_audit_logs",
+          "admin_credit_grants",
         ];
         const data: Record<string, unknown> = {};
         for (const table of tables)

@@ -1344,3 +1344,114 @@ describe("payment webhook fulfillment and refund regression", () => {
     expect((await wallet(u.id))?.balance).toBe(100);
   });
 });
+
+describe("administrator email credit grants", () => {
+  async function admin() {
+    const u = await user(0, 0);
+    await db
+      .prepare("UPDATE user SET role='admin' WHERE id=?")
+      .bind(u.id)
+      .run();
+    return u;
+  }
+  const grant = (u: { id: string }) => ({
+    email: u.id.toUpperCase() + "@TEST.INVALID",
+    credits: 600,
+    tier: 3,
+    reason: "Internal generation testing",
+    key: crypto.randomUUID(),
+  });
+  it("grants credits and quality atomically without payment records and deduplicates retries", async () => {
+    const { grantCredits } = await import("../lib/admin-credits");
+    const a = await admin(),
+      u = await user(0, 0),
+      b = grant(u);
+    await Promise.all([grantCredits(db, a.id, b), grantCredits(db, a.id, b)]);
+    expect(await wallet(u.id)).toMatchObject({
+      balance: 600,
+      reserved: 0,
+      tier: 3,
+    });
+    const ledger = await db
+      .prepare("SELECT kind,delta FROM credit_transactions WHERE user_id=?")
+      .bind(u.id)
+      .all();
+    expect(ledger.results).toEqual([{ kind: "admin_grant", delta: 600 }]);
+    const orders = await db
+      .prepare("SELECT COUNT(*) n FROM payment_orders WHERE user_id=?")
+      .bind(u.id)
+      .first<{ n: number }>();
+    expect(orders?.n).toBe(0);
+    const log = await db
+      .prepare("SELECT admin_id,target,reason FROM admin_audit_logs WHERE id=?")
+      .bind("grant:" + b.key)
+      .first();
+    expect(log).toEqual({ admin_id: a.id, target: u.id, reason: b.reason });
+    await expect(
+      grantCredits(db, a.id, { ...b, credits: 900 }),
+    ).rejects.toThrow("different credit grant");
+    expect((await wallet(u.id))?.balance).toBe(600);
+  });
+  it("requires an administrator and an existing recipient, and bounds grant values", async () => {
+    const { grantCredits } = await import("../lib/admin-credits");
+    const a = await admin(),
+      u = await user(0, 0),
+      b = grant(u);
+    await expect(grantCredits(db, u.id, b)).rejects.toThrow("Administrator");
+    await expect(
+      grantCredits(db, a.id, { ...b, email: "missing@test.invalid" }),
+    ).rejects.toThrow("sign in first");
+    for (const patch of [
+      { credits: 0 },
+      { credits: 10001 },
+      { credits: 1.5 },
+      { tier: 4 },
+      { reason: "" },
+    ])
+      await expect(
+        grantCredits(db, a.id, { ...b, ...patch }),
+      ).rejects.toThrow();
+    expect((await wallet(u.id))?.balance).toBe(0);
+    const response = await handle(
+      new Request("http://localhost/api/admin/credits", {
+        method: "POST",
+        headers: await authenticated(u.id),
+        body: JSON.stringify(b),
+      }),
+      e,
+    );
+    expect(response.status).toBe(403);
+  });
+  it("preserves granted resolution when a paid order is refunded and permits testing generation", async () => {
+    const { grantCredits } = await import("../lib/admin-credits");
+    const a = await admin(),
+      u = await user(0, 0);
+    const response = await handle(
+      new Request("http://localhost/api/admin/credits", {
+        method: "POST",
+        headers: await authenticated(a.id),
+        body: JSON.stringify(grant(u)),
+      }),
+      e,
+    );
+    expect(response.status).toBe(200);
+    const o = await order(u.id);
+    await applyPayment(db, o, {
+      id: crypto.randomUUID(),
+      type: "order.completed",
+      providerId: o.id,
+    });
+    await applyPayment(db, o, {
+      id: crypto.randomUUID(),
+      type: "refund.succeeded",
+      providerId: o.id,
+    });
+    expect(await wallet(u.id)).toMatchObject({ balance: 600, tier: 3 });
+    await reserveTask(db, u.id, input(u.assets, "1080p"), true);
+    expect(await wallet(u.id)).toMatchObject({
+      balance: 200,
+      reserved: 400,
+      tier: 3,
+    });
+  });
+});

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Button } from "./ui/button";
 import { Pricing } from "./pricing";
 import { TIER_NAMES } from "@/lib/catalog";
@@ -475,6 +475,109 @@ export function Table({
     <p style={{ padding: "20px 0", fontSize: 13 }}>Nothing here yet.</p>
   );
 }
+function CreditGrantForm({ onGranted }: { onGranted: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const attempt = useRef<{ body: string; key: string } | null>(null);
+  const submitting = useRef(false);
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitting.current) return;
+    const form = event.currentTarget,
+      values = new FormData(form);
+    const payload = {
+      email: String(values.get("email")).trim(),
+      credits: Number(values.get("credits")),
+      tier: Number(values.get("tier")),
+      reason: String(values.get("reason")).trim(),
+    };
+    const body = JSON.stringify(payload);
+    if (attempt.current?.body !== body)
+      attempt.current = { body, key: crypto.randomUUID() };
+    submitting.current = true;
+    setBusy(true);
+    setError("");
+    setSuccess("");
+    try {
+      const result = await request("admin/credits", "POST", {
+        ...payload,
+        key: attempt.current.key,
+      });
+      setSuccess(
+        `${result.email}: added ${result.credits} credits. Balance: ${result.wallet.balance}; reserved: ${result.wallet.reserved}. Reference: ${result.id}`,
+      );
+      form.reset();
+      attempt.current = null;
+      await onGranted();
+    } catch (error) {
+      setError((error as Error).message);
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="admin-section">
+      <h2>Grant test credits</h2>
+      <p>
+        Grant credits to a registered account without a payment. Live video
+        generation and safety checks still incur provider charges.
+      </p>
+      <form className="form-stack" onSubmit={submit}>
+        <label>
+          Recipient email
+          <input
+            name="email"
+            type="email"
+            required
+            maxLength={254}
+            placeholder="Your signed-in account email"
+          />
+        </label>
+        <label>
+          Credits
+          <input
+            name="credits"
+            type="number"
+            min={1}
+            max={10000}
+            step={1}
+            defaultValue={600}
+            required
+          />
+        </label>
+        <label>
+          Resolution access
+          <select name="tier" defaultValue="3">
+            <option value="1">480p</option>
+            <option value="2">Up to 768p</option>
+            <option value="3">Up to 1080p</option>
+          </select>
+        </label>
+        <label>
+          Reason
+          <textarea
+            name="reason"
+            required
+            minLength={5}
+            maxLength={500}
+            placeholder="Internal generation testing"
+          />
+        </label>
+        <Button disabled={busy}>
+          {busy ? "Granting…" : "Grant credits and record action"}
+        </Button>
+      </form>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      {success && <p role="status">{success}</p>}
+    </section>
+  );
+}
 export function Admin() {
   const [data, setData] = useState<Record<
     string,
@@ -542,6 +645,7 @@ export function Admin() {
         </Link>
       ) : (
         <>
+          <CreditGrantForm onGranted={load} />
           <section className="admin-section">
             <h2>Audited actions</h2>
             <form className="form-stack" onSubmit={submit}>
@@ -606,6 +710,19 @@ export function Admin() {
           </section>
           {[
             ["Users", "user", ["id", "name", "email", "role"]],
+            [
+              "Manual credit grants",
+              "admin_credit_grants",
+              [
+                "id",
+                "user_id",
+                "credits",
+                "tier",
+                "reason",
+                "admin_id",
+                "created_at",
+              ],
+            ],
             [
               "Orders",
               "payment_orders",

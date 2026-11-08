@@ -160,3 +160,5 @@ npx wrangler deploy --config wrangler.jobs.jsonc --dry-run
 ### 内容检测
 
 真实生成采用 SeeAPI 提示词、双图、模板视频和成片检测，保留人工审核；未通过的成片不开放下载。检测记录与重试持久化，批准绑定 R2 ETag。需要在网页和 jobs Worker 同时配置 `SEEAPI_API_KEY`、`MEDIA_SIGNING_SECRET` 与正确 `APP_ORIGIN`，应用新 D1 迁移并验证 cron。具体限额、处理范围和激活步骤见 [部署说明](docs/deployment.md#seeapi-内容检测与新价格2026-11-08)。本地 Mock 不产生检测费用。
+
+管理员可在 `/admin` 的 **Grant test credits** 按已注册邮箱赠送积分并授予最高画质，无需付款。赠送有独立记录、积分流水和审计，重复提交不会重复到账，不伪造支付成功订单。先应用 `0006` 迁移；操作步骤与生成开关区别见 [部署说明](docs/deployment.md#管理员测试积分无需支付)。
