@@ -763,7 +763,7 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
     throw new AppError(404, "Not found.");
   } catch (error) {
     if (error instanceof AppError)
-      return json({ error: error.message }, error.status);
+      return json({ error: error.message, code: error.code }, error.status);
     if (error instanceof z.ZodError || error instanceof SyntaxError)
       return json({ error: "Invalid request. Please check your inputs." }, 400);
     console.error("Request failed", {

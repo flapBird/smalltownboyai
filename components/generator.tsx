@@ -38,7 +38,10 @@ async function api(path: string, body?: unknown) {
   );
   const d: any = await r.json();
   if (!r.ok)
-    throw new Error(d.error || "Something went wrong. Please try again.");
+    throw Object.assign(
+      new Error(d.error || "Something went wrong. Please try again."),
+      { code: d.code },
+    );
   return d;
 }
 const saveDraft = (key: string, file: File) =>
@@ -151,10 +154,7 @@ export function Generator() {
         .catch(() => localStorage.removeItem("smalltown-task"));
   }, []);
   useEffect(() => {
-    if (
-      !task ||
-      ["completed", "failed", "review", "unknown"].includes(task.status)
-    )
+    if (!task || ["completed", "failed", "unknown"].includes(task.status))
       return;
     const timer = setInterval(
       () =>
@@ -217,6 +217,14 @@ export function Generator() {
       setBusy("");
     }
   }
+  const [checkingInputs, setCheckingInputs] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   async function generate() {
     setMessage("");
     if (!user) {
@@ -272,14 +280,36 @@ export function Generator() {
         );
       }
       key.current ??= crypto.randomUUID();
-      const t = await api("tasks", {
+      const payload = {
         assetA: ids[0],
         assetB: ids[1],
         resolution,
         templateId,
         requestKey: key.current,
         consent: true,
-      });
+      };
+      let t: Task | undefined;
+      for (let attempt = 0; attempt < 40; attempt++) {
+        try {
+          t = await api("tasks", payload);
+          break;
+        } catch (error) {
+          if ((error as { code?: string }).code !== "SAFETY_PENDING")
+            throw error;
+          setCheckingInputs(true);
+          setMessage(
+            "Checking your photos automatically. Generation will start when checks pass.",
+          );
+          await new Promise((resolve) => setTimeout(resolve, 30000));
+          if (!mounted.current) return;
+        }
+      }
+      if (!t)
+        throw new Error(
+          "Safety checks are taking longer than expected. Please try again later; no generation credits were charged.",
+        );
+      setCheckingInputs(false);
+      setMessage("");
       setTask(t);
       localStorage.setItem("smalltown-task", t.id);
       await api("me").then((u) => {
@@ -289,6 +319,7 @@ export function Generator() {
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
+      setCheckingInputs(false);
       setBusy("");
     }
   }
@@ -525,8 +556,15 @@ export function Generator() {
                 : "Live generation is coming soon."}
           </p>
           {message && (
-            <div className="error" role="alert">
-              <AlertCircle size={16} />
+            <div
+              className={checkingInputs ? "status-note" : "error"}
+              role={checkingInputs ? "status" : "alert"}
+            >
+              {checkingInputs ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <AlertCircle size={16} />
+              )}
               {message}
             </div>
           )}
@@ -551,7 +589,7 @@ export function Generator() {
                   {task.status === "failed"
                     ? "This one missed a beat"
                     : task.status === "review"
-                      ? "Ready for review"
+                      ? "Checking your video"
                       : task.status === "unknown"
                         ? "Checking your submission"
                         : "Your duo is taking shape"}
@@ -578,7 +616,7 @@ export function Generator() {
                       ? "Safety checks flagged this video. It remains private; contact support for review."
                       : task.error_code === "SAFETY_UNAVAILABLE"
                         ? "Safety checks could not finish. Your video remains private; contact support for review."
-                        : "Your video is awaiting safety checks and content review."
+                        : "Checking your video automatically. It will be ready to download when checks pass."
                     : "Your task is saved. You can check back in My Videos."}
             </p>
             <small>

@@ -1017,6 +1017,148 @@ describe("durable safety gates", () => {
     SEEAPI_API_KEY: "fake-test-key",
     MEDIA_SIGNING_SECRET: "test-only",
   });
+  it("automatically approves pending photos only after all checks pass", async () => {
+    const { ensureCheck, moderateInputs } = await import("../lib/moderation");
+    const prompts = await import("../lib/prompt-safety");
+    const templates = await import("../lib/templates");
+    const prompt = vi
+      .spyOn(prompts, "screenPrompt")
+      .mockResolvedValue(undefined);
+    const env = safetyEnv(),
+      u = await user();
+    const clip = await e.MEDIA.put(
+      "templates/auto-test.mp4",
+      readFileSync("public/fixtures/mock.mp4"),
+    );
+    const template = {
+      ...TEMPLATES[0],
+      objectKey: "templates/auto-test.mp4",
+      etag: clip!.etag,
+    };
+    const templateMock = vi
+      .spyOn(templates, "getTemplate")
+      .mockReturnValue(template as (typeof TEMPLATES)[0]);
+    try {
+      await db
+        .prepare(
+          "UPDATE settings SET value='false' WHERE key='generation_paused'",
+        )
+        .run();
+      const checks = [];
+      for (const id of u.assets) {
+        const key = "uploads/" + id;
+        const obj = await e.MEDIA.put(
+          key,
+          readFileSync("public/images/character-a.png"),
+        );
+        await db
+          .prepare("UPDATE media_assets SET moderation='pending' WHERE id=?")
+          .bind(id)
+          .run();
+        checks.push(
+          await ensureCheck(env, u.id, "input", id, "image", {
+            key,
+            etag: obj!.etag,
+          }),
+        );
+      }
+      checks.push(
+        await ensureCheck(env, u.id, "template", "living-room:1", "video", {
+          key: template.objectKey,
+          etag: clip!.etag,
+        }),
+      );
+      for (const c of checks)
+        await db
+          .prepare("UPDATE moderation_checks SET state='passed' WHERE id=?")
+          .bind(c.id)
+          .run();
+      await db
+        .prepare("UPDATE moderation_checks SET state='blocked' WHERE id=?")
+        .bind(checks[1].id)
+        .run();
+      await expect(moderateInputs(env, u.id, input(u.assets))).rejects.toThrow(
+        "blocked",
+      );
+      expect((await wallet(u.id))?.balance).toBe(600);
+      expect(
+        (
+          await db
+            .prepare("SELECT moderation FROM media_assets WHERE id=?")
+            .bind(u.assets[0])
+            .first()
+        )?.moderation,
+      ).toBe("pending");
+      await db
+        .prepare("UPDATE moderation_checks SET state='passed' WHERE id=?")
+        .bind(checks[1].id)
+        .run();
+      expect(await moderateInputs(env, u.id, input(u.assets))).toHaveLength(2);
+      const { task } = await reserveTask(db, u.id, input(u.assets), false);
+      expect(task.status).toBe("queued");
+      expect((await wallet(u.id))?.reserved).toBe(100);
+      await db
+        .prepare("UPDATE media_assets SET moderation='rejected' WHERE id=?")
+        .bind(u.assets[0])
+        .run();
+      await expect(moderateInputs(env, u.id, input(u.assets))).rejects.toThrow(
+        "rejected",
+      );
+    } finally {
+      prompt.mockRestore();
+      templateMock.mockRestore();
+    }
+  });
+  it("automatically delivers passed outputs once, keeping blocked and unavailable outputs private", async () => {
+    const { ensureCheck, reconcileModeration } =
+      await import("../lib/moderation");
+    const env = safetyEnv();
+    for (const state of ["passed", "blocked", "unavailable"]) {
+      const u = await user();
+      const { task } = await reserveTask(db, u.id, input(u.assets), false);
+      const key = "outputs/" + u.id + "/auto.mp4";
+      const obj = await e.MEDIA.put(
+        key,
+        readFileSync("public/fixtures/mock.mp4"),
+      );
+      await db
+        .prepare(
+          "UPDATE video_tasks SET status='review', output_key=? WHERE id=?",
+        )
+        .bind(key, task.id)
+        .run();
+      const c = await ensureCheck(env, u.id, "output", task.id, "video", {
+        key,
+        etag: obj!.etag,
+      });
+      await db
+        .prepare("UPDATE moderation_checks SET state=? WHERE id=?")
+        .bind(state, c.id)
+        .run();
+      await reconcileModeration(env);
+      await reconcileModeration(env);
+      const row = await db
+        .prepare("SELECT status FROM video_tasks WHERE id=?")
+        .bind(task.id)
+        .first();
+      expect(row?.status).toBe(state === "passed" ? "completed" : "review");
+      const ledger = await db
+        .prepare(
+          "SELECT COUNT(*) n FROM credit_transactions WHERE business_key=?",
+        )
+        .bind("settle:" + task.id)
+        .first();
+      expect(ledger?.n).toBe(state === "passed" ? 1 : 0);
+      expect((await wallet(u.id))?.reserved).toBe(state === "passed" ? 0 : 100);
+      const response = await handle(
+        new Request("http://localhost/api/tasks/" + task.id + "/video", {
+          headers: await authenticated(u.id),
+        }),
+        env,
+      );
+      expect(response.status).toBe(state === "passed" ? 200 : 404);
+    }
+  });
   it("persists identical body/key after a lost POST, then polls the saved ID", async () => {
     const { ensureCheck, runCheck } = await import("../lib/moderation");
     const owner = crypto.randomUUID(),

@@ -6,7 +6,7 @@ import { imageInfo, signature, validSignature } from "./media";
 import { H3_PROMPT } from "./providers/wavespeed";
 import { SPECS, type Resolution } from "./catalog";
 import { getTemplate } from "./templates";
-import type { TaskRow } from "./credits";
+import { settleTask, type TaskRow } from "./credits";
 
 export const POLICY = "seeapi-strict-v1";
 export const TEXT_CATEGORIES = [
@@ -515,7 +515,8 @@ async function requirePass(e: Bindings, c: Check) {
   if (done.state !== "passed")
     throw new AppError(
       409,
-      "Safety checks are pending. Retry in a minute; no generation credits have been charged.",
+      "Checking your photos automatically. No generation credits have been charged.",
+      "SAFETY_PENDING",
     );
   return done;
 }
@@ -562,10 +563,10 @@ export async function moderateInputs(
     )
       .bind(id, owner)
       .first<{ object_key: string; moderation: string }>();
-    if (!asset || asset.moderation !== "approved")
+    if (!asset || asset.moderation === "rejected")
       throw new AppError(
         409,
-        "Your photos must pass input review before generation.",
+        "This photo is unavailable or was rejected. Choose another photo or contact support.",
       );
     const head = await e.MEDIA.head(asset.object_key);
     if (!head) throw new AppError(404, "Photo missing.");
@@ -602,6 +603,14 @@ export async function moderateInputs(
   for (const c of checked)
     if ((await e.MEDIA.head(c.asset_key!))?.etag !== c.asset_etag)
       throw new AppError(409, "Photo changed; retry safety checks.");
+  // Only automatic passes may promote pending uploads; never override an admin rejection.
+  await e.DB.batch(
+    assets.map((a) =>
+      e.DB.prepare(
+        "UPDATE media_assets SET moderation='approved' WHERE id=? AND user_id=? AND object_key=? AND moderation='pending'",
+      ).bind(a.id, owner, a.key),
+    ),
+  );
   return Promise.all(checked.map((c) => mediaCheckURL(e, c.id))) as Promise<
     [string, string]
   >;
@@ -655,6 +664,19 @@ export async function reconcileModeration(e: Bindings) {
       await runCheck(e, c.id);
     } catch {
       /* Keep private for administrator review. No refund or regeneration on moderation errors. */
+    }
+  }
+  const passed = await e.DB.prepare(
+    "SELECT * FROM video_tasks WHERE provider='wavespeed' AND status='review' AND EXISTS (SELECT 1 FROM moderation_checks c WHERE c.owner=video_tasks.user_id AND c.stage='output' AND c.asset_key=video_tasks.output_key AND c.policy=? AND c.state='passed') ORDER BY updated_at LIMIT 10",
+  )
+    .bind(POLICY)
+    .all<TaskRow>();
+  for (const t of passed.results) {
+    try {
+      await approvedOutputEtag(e, t);
+      await settleTask(e.DB, t.id, true, t.output_key, null, "review");
+    } catch {
+      // Changed or missing bytes stay private; a cached pass cannot release them.
     }
   }
 }
