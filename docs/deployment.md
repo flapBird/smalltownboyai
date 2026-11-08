@@ -143,3 +143,9 @@ Google 回调；Waffo sandbox 完整付款、重发、乱序、退款；迁移�
 生成提示词改由 Waffo `contentSafety.scanPrompt` 检测，使用实际 H3_PROMPT、semantic=enforce，仅 allow 放行；未配置、异常或拒绝均不调用生成。SeeAPI 保留图片、模板和成片检测，不再发起或轮询旧文字检测。网页 Worker 需配置 WAFFO_MERCHANT_ID 与 WAFFO_PRIVATE_KEY，即使 PAYMENTS_ENABLED=false 也需要这两个值以运行文字检测。此调整不代表已完成真实接口联调。
 
 后台需同时满足：Google 已登录、数据库 role=admin、邮箱位于 ADMIN_EMAILS（逗号分隔）、输入 ADMIN_PASSWORD。ADMIN_PASSWORD 在 Cloudflare 设置为 Secret；不写入客户端或公开变量。解锁签发绑定用户的 HttpOnly/SameSite Cookie，有效30分钟；修改密码使旧凭据失效。所有 /api/admin 路由（含视频预览）均检查认证，密码错误有每用户5次/5分钟限流。缺配置默认拒绝；不提供公共自助提权。
+
+## 后台管理模板、画质与授权
+
+登录并解锁 `/admin` → **Generation settings**：勾选开放画质，逐个模板确认视频及音频使用权后启用，填写修改原因并保存。设置保存到现有 D1 `settings` 表，审计记录保存操作员和配置快照，不需要新增数据库迁移。关闭模板或画质将阻止对应新任务，不取消已提交的供应商任务；停用模板也会关闭它的签名源文件访问，请在无进行中任务时操作。
+
+第一次保存前兼容旧 `VERIFIED_TEMPLATES` / `VERIFIED_RESOLUTIONS` / `REFERENCE_LICENSE_CONFIRMED` 作为初始值；从未配置时默认全部关闭。保存后数据库配置优先，这三个 Cloudflare 变量可删除。授权按具体模板版本记录，不会自动确认新模板版本。保留 `GENERATION_ENABLED` 总开关与 `TEMPLATE_PREVIEWS_ENABLED` 首页预览开关。后台配置不会跳过密钥、素材版本、积分或内容检测校验。

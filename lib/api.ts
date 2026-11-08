@@ -1,3 +1,8 @@
+import {
+  readGenerationSettings,
+  runtimeGenerationSettings,
+  saveGenerationSettings,
+} from "./generation-settings";
 import { allowedAdmin, unlockAdmin, requireAdminSession } from "./admin-access";
 import { grantCredits } from "./admin-credits";
 import {
@@ -130,6 +135,12 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
     const parts = url.pathname.replace(/^\/api\/?/, "").split("/");
     const path = parts.join("/");
     const mock = localMock(e, r);
+    if (
+      path === "config" ||
+      (path === "tasks" && r.method === "POST") ||
+      parts[0] === "templates"
+    )
+      e = await runtimeGenerationSettings(e);
     if (
       r.method === "GET" &&
       parts[0] === "moderation-media" &&
@@ -578,6 +589,11 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
         });
       }
       await requireAdminSession(e, r, u.id);
+      if (path === "admin/generation-settings") {
+        if (r.method === "GET") return json(await readGenerationSettings(e));
+        if (r.method === "POST")
+          return json(await saveGenerationSettings(e, u.id, await body(r)));
+      }
       if (r.method === "POST" && path === "admin/credits") {
         await rateLimit(e.DB, "admin-credit:" + u.id, 10, 60);
         return json(await grantCredits(e.DB, u.id, await body(r)));

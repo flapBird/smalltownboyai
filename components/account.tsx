@@ -475,6 +475,125 @@ export function Table({
     <p style={{ padding: "20px 0", fontSize: 13 }}>Nothing here yet.</p>
   );
 }
+function GenerationSettingsForm() {
+  const [settings, setSettings] = useState<
+    import("@/lib/generation-settings").GenerationSettings | null
+  >(null);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    request("admin/generation-settings")
+      .then(setSettings)
+      .catch((e) => setMessage(e.message));
+  }, []);
+  return (
+    <section className="admin-section">
+      <h2>Generation settings</h2>
+      <p>
+        Enable templates and quality levels after testing. The server generation
+        switch must also be enabled.
+      </p>
+      {settings && (
+        <form
+          className="form-stack"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setBusy(true);
+            setMessage("");
+            try {
+              setSettings(
+                await request("admin/generation-settings", "POST", {
+                  ...settings,
+                  reason: new FormData(event.currentTarget).get("reason"),
+                }),
+              );
+              setMessage(
+                "Settings saved. Changes apply to new requests immediately.",
+              );
+            } catch (error) {
+              setMessage((error as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <fieldset>
+            <legend>Available resolutions</legend>
+            {(["480p", "768p", "1080p"] as const).map((r) => (
+              <label key={r}>
+                <input
+                  type="checkbox"
+                  checked={settings.resolutions.includes(r)}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      resolutions: event.target.checked
+                        ? [...settings.resolutions, r]
+                        : settings.resolutions.filter((v) => v !== r),
+                    })
+                  }
+                />
+                {r}
+              </label>
+            ))}
+          </fieldset>
+          {settings.templates.map((t, i) => (
+            <fieldset key={t.id}>
+              <legend>
+                {t.id === "living-room" ? "Living room" : "Red fence"}
+              </legend>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={t.licensed}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      templates: settings.templates.map((v, j) =>
+                        j === i
+                          ? {
+                              ...v,
+                              licensed: event.target.checked,
+                              enabled: event.target.checked ? v.enabled : false,
+                            }
+                          : v,
+                      ),
+                    })
+                  }
+                />
+                I confirm the rights to use this template and its audio.
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={t.enabled}
+                  disabled={!t.licensed}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      templates: settings.templates.map((v, j) =>
+                        j === i ? { ...v, enabled: event.target.checked } : v,
+                      ),
+                    })
+                  }
+                />
+                Enable for generation
+              </label>
+            </fieldset>
+          ))}
+          <label>
+            Reason for change
+            <textarea name="reason" required minLength={5} maxLength={500} />
+          </label>
+          <Button disabled={busy}>
+            {busy ? "Saving…" : "Save generation settings"}
+          </Button>
+        </form>
+      )}
+      {message && <p role="status">{message}</p>}
+    </section>
+  );
+}
 function CreditGrantForm({ onGranted }: { onGranted: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -675,6 +794,7 @@ export function Admin() {
         </form>
       ) : (
         <>
+          <GenerationSettingsForm />
           <CreditGrantForm onGranted={load} />
           <section className="admin-section">
             <h2>Audited actions</h2>

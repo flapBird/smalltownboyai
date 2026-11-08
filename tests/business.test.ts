@@ -1482,3 +1482,72 @@ it("requires configured admin email and password session even for an admin role"
   const { unlockAdmin } = await import("../lib/admin-access");
   await expect(unlockAdmin(e, u.id, "wrong")).rejects.toThrow("Incorrect");
 });
+
+it("admin generation settings override legacy variables and enforce per-template rights", async () => {
+  const {
+    saveGenerationSettings,
+    readGenerationSettings,
+    runtimeGenerationSettings,
+  } = await import("../lib/generation-settings");
+  const u = await user();
+  await db.prepare("UPDATE user SET role='admin' WHERE id=?").bind(u.id).run();
+  const headers = await authenticated(u.id);
+  const config = {
+    resolutions: ["480p"],
+    templates: TEMPLATES.map((t) => ({
+      id: t.id,
+      version: t.version,
+      enabled: t.id === "living-room",
+      licensed: t.id === "living-room",
+    })),
+    reason: "Enable tested template",
+  };
+  try {
+    const bad = {
+      ...config,
+      templates: config.templates.map((t) => ({ ...t, licensed: false })),
+    };
+    await expect(saveGenerationSettings(e, u.id, bad)).rejects.toThrow(
+      "rights",
+    );
+    const response = await handle(
+      new Request("http://localhost/api/admin/generation-settings", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(config),
+      }),
+      e,
+    );
+    expect(response.status).toBe(200);
+    expect((await readGenerationSettings(e)).resolutions).toEqual(["480p"]);
+    const resolved = await runtimeGenerationSettings({
+      ...e,
+      VERIFIED_TEMPLATES: "red-fence",
+      VERIFIED_RESOLUTIONS: "1080p",
+      REFERENCE_LICENSE_CONFIRMED: "false",
+    });
+    expect(resolved.VERIFIED_TEMPLATES).toBe("living-room");
+    expect(resolved.VERIFIED_RESOLUTIONS).toBe("480p");
+    expect(resolved.REFERENCE_LICENSE_CONFIRMED).toBe("true");
+    await saveGenerationSettings(e, u.id, {
+      ...config,
+      resolutions: [],
+      templates: config.templates.map((t) => ({ ...t, enabled: false })),
+    });
+    expect((await runtimeGenerationSettings(e)).VERIFIED_TEMPLATES).toBe("");
+    const ordinary = await user();
+    const denied = await handle(
+      new Request("http://localhost/api/admin/generation-settings", {
+        method: "POST",
+        headers: await authenticated(ordinary.id),
+        body: JSON.stringify(config),
+      }),
+      e,
+    );
+    expect(denied.status).toBe(403);
+  } finally {
+    await db
+      .prepare("DELETE FROM settings WHERE key='generation_config'")
+      .run();
+  }
+});
