@@ -149,3 +149,10 @@ Google 回调；Waffo sandbox 完整付款、重发、乱序、退款；迁移�
 登录并解锁 `/admin` → **Generation settings**：勾选开放画质，逐个模板确认视频及音频使用权后启用，填写修改原因并保存。设置保存到现有 D1 `settings` 表，审计记录保存操作员和配置快照，不需要新增数据库迁移。关闭模板或画质将阻止对应新任务，不取消已提交的供应商任务；停用模板也会关闭它的签名源文件访问，请在无进行中任务时操作。
 
 第一次保存前兼容旧 `VERIFIED_TEMPLATES` / `VERIFIED_RESOLUTIONS` / `REFERENCE_LICENSE_CONFIRMED` 作为初始值；从未配置时默认全部关闭。保存后数据库配置优先，这三个 Cloudflare 变量可删除。授权按具体模板版本记录，不会自动确认新模板版本。保留 `GENERATION_ENABLED` 总开关与 `TEMPLATE_PREVIEWS_ENABLED` 首页预览开关。后台配置不会跳过密钥、素材版本、积分或内容检测校验。
+
+
+## 部署时保留后台变量
+
+Web 和 Jobs 的 Wrangler 配置均使用 `keep_vars: true`，且不声明 `vars`。所有线上运行变量与 Secret 由各 Worker 的 Cloudflare Settings → Variables and Secrets 管理；不要把生成/支付开关、支付环境、商店 ID、输出域名或检测额度重新加入部署配置，以免同名值在 Git 部署时覆盖后台设置。构建后还应确认 `dist/server/wrangler.json` 保留 `keep_vars: true` 且 `vars` 为空。
+
+首次部署须在后台配置 `APP_MODE=production`、`APP_ORIGIN=https://smalltownboyai.one` 和上文所列业务参数。Jobs 也需单独配置来源域名、密钥与 `OUTPUT_HOSTS`；现有后台参数由后续部署保留。本地开发继续使用未提交的 `.dev.vars`（参考 `.dev.vars.example`），不会上传本地密钥。此修复不会自动恢复此前被覆盖的值，恢复开关或支付环境应以实际运营配置为准。

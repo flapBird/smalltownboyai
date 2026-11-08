@@ -34,15 +34,9 @@
 			"binding": "smalltownboyai_private"
 		},
 	],
-	"vars": {
-		"APP_ORIGIN": "https://smalltownboyai.one",
-		"APP_MODE": "production",
-		"GENERATION_ENABLED": "false",
-		"TEMPLATE_PREVIEWS_ENABLED": "true",
-		"PAYMENTS_ENABLED": "false",
-		"WAFFO_ENVIRONMENT": "test",
-		"WAFFO_STORE_ID": "STO_3Gn9gFKccKSVnOjhUU1lYW",
-	},
+  // Runtime variables are managed in Cloudflare Settings.
+  // Do not add vars here: explicit values override Dashboard settings.
+
 	"observability": {
 		"enabled": true
 	},

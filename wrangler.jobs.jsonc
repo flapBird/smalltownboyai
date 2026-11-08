@@ -15,11 +15,8 @@
     { "binding": "MEDIA", "bucket_name": "smalltownboyai-private" },
   ],
   "keep_vars": true,
-  "vars": {
-    "APP_MODE": "production",
-    "APP_ORIGIN": "https://smalltownboyai.one",
-    "SEEAPI_DAILY_CHECK_LIMIT": "100",
-    "OUTPUT_HOSTS": "",
-  },
+  // Runtime variables are managed in Cloudflare Settings.
+  // Do not add vars here: explicit values override Dashboard settings.
+
   "observability": { "enabled": true },
 }
