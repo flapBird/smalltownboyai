@@ -137,3 +137,9 @@ Google 回调；Waffo sandbox 完整付款、重发、乱序、退款；迁移�
 4. 提交后显示实际到账、当前余额、冻结积分及记录编号。流水类型为 `admin_grant`，不创建 Waffo 订单、不伪造支付事件；操作员、对象、原因、数量和画质都有记录。相同请求键重复提交只到账一次；网络失败时在原页面以不变内容重试，不要重新填写另一笔赠送。
 5. 赠送画质权限不会因其他付费订单退款而丢失，也不会因低画质赠送而降级。该赠送无现金退款价值；本入口不提供撤回赠送功能。赠送本身不调用模型或支付，真实生成/检测仍消耗供应商账户余额。
 6. 测试顺序：赠送→上传双图→管理员批准输入→满足生成启用条件→提交/等待内容检测→H3生成→成片检测与人工批准→下载。此路径验证生成和账本，不代替支付成功/退款 Webhook 联调。
+
+## Waffo 前置文字审核与后台二次认证
+
+生成提示词改由 Waffo `contentSafety.scanPrompt` 检测，使用实际 H3_PROMPT、semantic=enforce，仅 allow 放行；未配置、异常或拒绝均不调用生成。SeeAPI 保留图片、模板和成片检测，不再发起或轮询旧文字检测。网页 Worker 需配置 WAFFO_MERCHANT_ID 与 WAFFO_PRIVATE_KEY，即使 PAYMENTS_ENABLED=false 也需要这两个值以运行文字检测。此调整不代表已完成真实接口联调。
+
+后台需同时满足：Google 已登录、数据库 role=admin、邮箱位于 ADMIN_EMAILS（逗号分隔）、输入 ADMIN_PASSWORD。ADMIN_PASSWORD 在 Cloudflare 设置为 Secret；不写入客户端或公开变量。解锁签发绑定用户的 HttpOnly/SameSite Cookie，有效30分钟；修改密码使旧凭据失效。所有 /api/admin 路由（含视频预览）均检查认证，密码错误有每用户5次/5分钟限流。缺配置默认拒绝；不提供公共自助提权。

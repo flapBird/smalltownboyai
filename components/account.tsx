@@ -640,9 +640,39 @@ export function Admin() {
         </p>
       )}
       {!data ? (
-        <Link className="button button-outline" href="/login">
-          Sign in with an administrator account
-        </Link>
+        <form
+          className="form-stack"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setError("");
+            const form = event.currentTarget;
+            try {
+              await request("admin/unlock", "POST", {
+                password: new FormData(form).get("password"),
+              });
+              form.reset();
+              await load();
+            } catch (error) {
+              setError((error as Error).message);
+            }
+          }}
+        >
+          <p>
+            Sign in with your configured administrator account, then enter the
+            administrator password.
+          </p>
+          <label>
+            Administrator password
+            <input
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+            />
+          </label>
+          <Button>Unlock admin workspace</Button>
+          <Link href="/login">Sign in</Link>
+        </form>
       ) : (
         <>
           <CreditGrantForm onGranted={load} />

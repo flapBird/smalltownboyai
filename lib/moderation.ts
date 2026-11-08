@@ -1,3 +1,4 @@
+import { screenPrompt } from "./prompt-safety";
 import { z } from "zod";
 import type { Bindings } from "./env";
 import { AppError } from "./auth";
@@ -577,10 +578,7 @@ export async function moderateInputs(
     { key: template.objectKey, etag: template.etag },
     "video",
   );
-  await requirePass(
-    e,
-    await ensureCheck(e, owner, "prompt", "h3", "text", { text: H3_PROMPT }),
-  );
+  await screenPrompt(e, H3_PROMPT);
   const checked = [];
   for (const a of assets)
     checked.push(
@@ -632,7 +630,7 @@ export async function approvedOutputEtag(e: Bindings, t: TaskRow) {
 }
 export async function reconcileModeration(e: Bindings) {
   const rows = await e.DB.prepare(
-    "SELECT id FROM moderation_checks WHERE state='pending' AND next_at<=? AND lease_until<? ORDER BY created_at LIMIT 10",
+    "SELECT id FROM moderation_checks WHERE stage<>'prompt' AND state='pending' AND next_at<=? AND lease_until<? ORDER BY created_at LIMIT 10",
   )
     .bind(Date.now(), Date.now())
     .all<{ id: string }>();

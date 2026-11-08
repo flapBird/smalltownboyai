@@ -19,7 +19,7 @@ export const LEGAL: Record<
       ],
       [
         "Safety checks",
-        "For live generation, SeeAPI receives the generation prompt, both reference photos, the template video and the generated video for automated content checks. Video checks sample visual frames; they do not check audio or every frame and cannot guarantee safety. Results remain private until automated checks and our output review pass. SeeAPI states that stored files, task information and moderation results have no scheduled automatic expiry; request logs are retained for 60 days. Expiring our links does not delete provider copies. Contact support@smalltownboyai.one for a deletion request, including the relevant task ID. Local demo mode does not submit media to SeeAPI.",
+        "For live generation, Waffo screens the generation prompt before generation. SeeAPI receives both reference photos, the template video and the generated video for automated content checks. Video checks sample visual frames; they do not check audio or every frame and cannot guarantee safety. Results remain private until automated checks and our output review pass. SeeAPI states that stored files, task information and moderation results have no scheduled automatic expiry; request logs are retained for 60 days. Expiring our links does not delete provider copies. Contact support@smalltownboyai.one for a deletion request, including the relevant task ID. Local demo mode does not submit media to SeeAPI.",
       ],
       [
         "Storage and deletion",
@@ -129,6 +129,14 @@ export const LEGAL: Record<
       [
         "Prohibited content",
         "Do not submit real people, face swaps, public figures, impersonations, sexual content, exploitation, abuse, graphic violence, hateful material, fraud, illegal content or content that infringes someone else’s privacy or intellectual property.",
+      ],
+      [
+        "Child safety — zero tolerance",
+        "We have zero tolerance for child sexual abuse material (CSAM), child sexual exploitation, sexualized depictions of anyone under 18, grooming, or content that promotes or facilitates harm to children. Uploading, requesting, generating, storing or sharing such content is prohibited, including AI-generated, altered, fictional or simulated depictions. These prohibitions apply regardless of claimed consent or purpose.",
+      ],
+      [
+        "Non-consensual intimate imagery — zero tolerance",
+        "We have zero tolerance for non-consensual intimate imagery (NCII). Do not upload, request, generate or share intimate or sexual depictions of a person without their explicit consent, including synthetic sexual deepfakes, nudification, intimate image manipulation, revenge pornography, or threats to distribute such content. Claimed consent does not override our broader prohibition on real-person uploads and sexual content.",
       ],
       [
         "Review and enforcement",

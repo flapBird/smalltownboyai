@@ -1,3 +1,4 @@
+import { allowedAdmin, unlockAdmin, requireAdminSession } from "./admin-access";
 import { grantCredits } from "./admin-credits";
 import {
   moderateInputs,
@@ -274,6 +275,10 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
       const u = signed ? null : await identity(e, r);
       if (!signed && u?.id !== asset.user_id && u?.role !== "admin")
         throw new AppError(404, "File not found.");
+      if (!signed && u?.role === "admin" && u.id !== asset.user_id) {
+        allowedAdmin(e, u);
+        await requireAdminSession(e, r, u.id);
+      }
       return await objectResponse(e, asset.object_key);
     }
     const u = await requireUser(e, r);
@@ -561,6 +566,18 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
     if (parts[0] === "admin") {
       if (u.role !== "admin")
         throw new AppError(403, "Administrator access required.");
+      allowedAdmin(e, u);
+      if (r.method === "POST" && path === "admin/unlock") {
+        await rateLimit(e.DB, "admin-unlock:" + u.id, 5, 300);
+        const b = z
+          .object({ password: z.string().min(1).max(1024) })
+          .parse(await body(r));
+        const token = await unlockAdmin(e, u.id, b.password);
+        return json({ ok: true }, 200, {
+          "Set-Cookie": `admin_access=${token}; HttpOnly; SameSite=Strict; Path=/api; Max-Age=1800${url.protocol === "https:" ? "; Secure" : ""}`,
+        });
+      }
+      await requireAdminSession(e, r, u.id);
       if (r.method === "POST" && path === "admin/credits") {
         await rateLimit(e.DB, "admin-credit:" + u.id, 10, 60);
         return json(await grantCredits(e.DB, u.id, await body(r)));

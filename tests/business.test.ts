@@ -473,8 +473,15 @@ async function authenticated(uid: string) {
     .prepare("INSERT INTO mock_sessions VALUES (?,?,?)")
     .bind(token, uid, Date.now() + 60000)
     .run();
+  const admins = await db
+    .prepare("SELECT email FROM user WHERE role='admin'")
+    .all<{ email: string }>();
+  e.ADMIN_EMAILS = admins.results.map((u) => u.email).join(",");
+  e.ADMIN_PASSWORD = "test-admin-password";
+  const { unlockAdmin } = await import("../lib/admin-access");
+  const access = await unlockAdmin(e, uid, e.ADMIN_PASSWORD);
   return {
-    cookie: "mock_session=" + token,
+    cookie: "mock_session=" + token + "; admin_access=" + access,
     origin: "http://localhost",
     "Content-Type": "application/json",
   };
@@ -1178,6 +1185,7 @@ it("blocks output downloads and administrator approval without safety approval",
     ).status,
   ).toBe(404);
   await db.prepare("UPDATE user SET role='admin' WHERE id=?").bind(u.id).run();
+  Object.assign(headers, await authenticated(u.id));
   const approve = await handle(
     new Request("http://localhost/api/admin/action", {
       method: "POST",
@@ -1454,4 +1462,23 @@ describe("administrator email credit grants", () => {
       tier: 3,
     });
   });
+});
+
+it("requires configured admin email and password session even for an admin role", async () => {
+  const u = await user();
+  await db.prepare("UPDATE user SET role='admin' WHERE id=?").bind(u.id).run();
+  const headers = await authenticated(u.id);
+  const send = (env: Bindings, h = headers) =>
+    handle(new Request("http://localhost/api/admin", { headers: h }), env);
+  expect(
+    (await send({ ...e, ADMIN_EMAILS: "someone-else@example.com" })).status,
+  ).toBe(403);
+  expect((await send({ ...e, ADMIN_PASSWORD: undefined })).status).toBe(403);
+  expect(
+    (await send(e, { ...headers, cookie: headers.cookie.split(";")[0] }))
+      .status,
+  ).toBe(403);
+  expect((await send(e)).status).toBe(200);
+  const { unlockAdmin } = await import("../lib/admin-access");
+  await expect(unlockAdmin(e, u.id, "wrong")).rejects.toThrow("Incorrect");
 });

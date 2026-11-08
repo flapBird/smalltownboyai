@@ -5,6 +5,8 @@ export interface Bindings {
   MEDIA: R2Bucket;
   APP_ORIGIN: string;
   APP_MODE: string;
+  ADMIN_EMAILS?: string;
+  ADMIN_PASSWORD?: string;
   BETTER_AUTH_SECRET?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
