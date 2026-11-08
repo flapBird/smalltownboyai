@@ -506,16 +506,18 @@ async function requirePass(e: Bindings, c: Check) {
     throw new AppError(
       422,
       "Safety check blocked this content. Choose different photos or contact support.",
+      "SAFETY_BLOCKED",
     );
   if (done.state === "unavailable")
     throw new AppError(
       503,
       "Safety checks could not finish. Contact support; this is not a content rejection.",
+      "SAFETY_UNAVAILABLE",
     );
   if (done.state !== "passed")
     throw new AppError(
       409,
-      "Checking your photos automatically. No generation credits have been charged.",
+      `${c.stage === "template" ? "Checking the dance template" : c.stage === "output" ? "Checking the generated video" : "Checking your photos"}. ${done.error === "TRANSPORT_RETRY" ? "The safety service connection is delayed; retrying automatically." : "Waiting for the safety service."} No new generation credits have been charged.`,
       "SAFETY_PENDING",
     );
   return done;

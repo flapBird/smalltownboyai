@@ -13,6 +13,11 @@ import {
   Download,
   AlertCircle,
 } from "lucide-react";
+import {
+  PENDING_GENERATION_KEY,
+  readPendingGeneration,
+  type PendingGeneration,
+} from "@/lib/generation-draft";
 import { TemplatePicker } from "./template-picker";
 import { Button } from "./ui/button";
 import { SPECS, type Resolution } from "@/lib/catalog";
@@ -29,8 +34,9 @@ async function api(path: string, body?: unknown) {
   const r = await fetch(
     "/api/" + path,
     body === undefined
-      ? undefined
+      ? { signal: AbortSignal.timeout(60000) }
       : {
+          signal: AbortSignal.timeout(60000),
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -93,6 +99,7 @@ export function Generator() {
   const [templateId, setTemplateId] = useState("living-room");
   const [resolution, setResolution] = useState<Resolution>("480p");
   const [user, setUser] = useState<{
+    id: string;
     wallet: { balance: number; tier: number };
   } | null>(null);
   const [config, setConfig] = useState({
@@ -110,10 +117,37 @@ export function Generator() {
     useRef<HTMLInputElement>(null),
   ];
   const key = useRef<string | null>(null);
+  const recovering = useRef(false);
+  const [pending, setPending] = useState<PendingGeneration | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!user || recovering.current) return;
+    const saved = readPendingGeneration(
+      localStorage.getItem(PENDING_GENERATION_KEY),
+      user.id,
+    );
+    if (!saved) return;
+    recovering.current = true;
+    setPending(saved);
+    setConsent(true);
+    setResolution(saved.payload.resolution);
+    setTemplateId(saved.payload.templateId);
+    key.current = saved.payload.requestKey;
+    void continueGeneration(saved);
+  }, [user?.id]);
+  useEffect(() => {
+    if (!pending) return;
+    const update = () =>
+      setElapsed(Math.floor((Date.now() - pending.startedAt) / 1000));
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [pending]);
   useEffect(() => {
     api("config")
       .then((c) => {
         setConfig(c);
+        if (recovering.current) return;
         const saved = localStorage.getItem("smalltown-template");
         const available = c.templates.filter(
           (t: PublicTemplate) => t.available,
@@ -173,7 +207,7 @@ export function Generator() {
     return () => clearInterval(timer);
   }, [task?.id, task?.status]);
   async function choose(i: number, file?: File) {
-    if (!file) return;
+    if (!file || pending) return;
     setMessage("");
     if (
       !["image/jpeg", "image/png"].includes(file.type) ||
@@ -227,6 +261,10 @@ export function Generator() {
   }, []);
   async function generate() {
     setMessage("");
+    if (pending && user?.id === pending.owner) {
+      await continueGeneration(pending);
+      return;
+    }
     if (!user) {
       location.href = "/login?next=" + encodeURIComponent("/#create");
       return;
@@ -266,7 +304,11 @@ export function Generator() {
         if (!f) throw new Error("Please select your photos again.");
         const body = new FormData();
         body.append("file", f);
-        const r = await fetch("/api/uploads", { method: "POST", body });
+        const r = await fetch("/api/uploads", {
+          method: "POST",
+          body,
+          signal: AbortSignal.timeout(60000),
+        });
         const d: any = await r.json().catch(() => ({
           error:
             r.status === 413
@@ -288,46 +330,88 @@ export function Generator() {
         requestKey: key.current,
         consent: true,
       };
+      const saved: PendingGeneration = {
+        owner: user.id,
+        startedAt: Date.now(),
+        payload: {
+          ...payload,
+          templateId: templateId as "living-room" | "red-fence",
+          consent: true,
+        },
+      };
+      localStorage.setItem(PENDING_GENERATION_KEY, JSON.stringify(saved));
+      setPending(saved);
+      await continueGeneration(saved);
+    } catch (e) {
+      setMessage((e as Error).message);
+      setBusy("");
+    }
+  }
+  async function continueGeneration(saved: PendingGeneration) {
+    setBusy("generate");
+    setCheckingInputs(true);
+    setMessage("Restoring your saved request. Checking progress…");
+    try {
       let t: Task | undefined;
-      for (let attempt = 0; attempt < 40; attempt++) {
+      // Bound this visit's wait; the original identity survives refreshes and retries.
+      for (let attempt = 0; attempt < 10; attempt++) {
+        if (!mounted.current) return;
         try {
-          t = await api("tasks", payload);
+          t = await api("tasks", saved.payload);
           break;
         } catch (error) {
           if ((error as { code?: string }).code !== "SAFETY_PENDING")
             throw error;
-          setCheckingInputs(true);
-          setMessage(
-            "Checking your photos automatically. Generation will start when checks pass.",
-          );
+          setMessage((error as Error).message);
           await new Promise((resolve) => setTimeout(resolve, 30000));
-          if (!mounted.current) return;
         }
       }
+      if (!mounted.current) return;
       if (!t)
         throw new Error(
-          "Safety checks are taking longer than expected. Please try again later; no generation credits were charged.",
+          "Checks are taking longer than expected. Your request is saved. Resume to check again; do not upload the photos again.",
         );
-      setCheckingInputs(false);
-      setMessage("");
-      setTask(t);
       localStorage.setItem("smalltown-task", t.id);
+      localStorage.removeItem(PENDING_GENERATION_KEY);
+      setPending(null);
+      setTask(t);
+      setMessage("");
       await api("me").then((u) => {
         setUser(u);
         window.dispatchEvent(new Event("wallet-updated"));
       });
     } catch (e) {
-      setMessage((e as Error).message);
+      const terminal = ["SAFETY_BLOCKED", "SAFETY_UNAVAILABLE"].includes(
+        (e as { code?: string }).code || "",
+      );
+      if (terminal) {
+        localStorage.removeItem(PENDING_GENERATION_KEY);
+        setPending(null);
+      }
+      if (mounted.current)
+        setMessage(
+          (e as Error).message +
+            (terminal
+              ? ""
+              : " Your request is saved; resume to check its status."),
+        );
     } finally {
-      setCheckingInputs(false);
-      setBusy("");
+      if (mounted.current) {
+        setCheckingInputs(false);
+        setBusy("");
+      }
     }
   }
   const active = task && !["completed", "failed"].includes(task.status);
   useEffect(() => {
     const select = (event: Event) => {
       const id = (event as CustomEvent).detail;
-      if (!active && !busy && config.templates.some((t) => t.id === id)) {
+      if (
+        !active &&
+        !busy &&
+        !pending &&
+        config.templates.some((t) => t.id === id)
+      ) {
         setTemplateId(id);
         localStorage.setItem("smalltown-template", id);
         key.current = null;
@@ -336,7 +420,7 @@ export function Generator() {
     window.addEventListener("smalltown-template-selected", select);
     return () =>
       window.removeEventListener("smalltown-template-selected", select);
-  }, [active, busy, config.templates]);
+  }, [active, busy, pending, config.templates]);
   const selectedTemplate = config.templates.find((t) => t.id === templateId);
   return (
     <section id="create" className="studio-create">
@@ -379,7 +463,7 @@ export function Generator() {
                         type="button"
                         className="pet-remove"
                         aria-label={"Remove character " + (i === 0 ? "A" : "B")}
-                        disabled={!!busy || !!active}
+                        disabled={!!busy || !!active || !!pending}
                         onClick={() => {
                           setPhotos((p) =>
                             p.map((v, n) => (n === i ? null : v)),
@@ -393,7 +477,7 @@ export function Generator() {
                       <button
                         type="button"
                         className="pet-change"
-                        disabled={!!busy || !!active}
+                        disabled={!!busy || !!active || !!pending}
                         onClick={() => inputs[i].current?.click()}
                       >
                         <Upload size={15} />
@@ -404,7 +488,7 @@ export function Generator() {
                     <button
                       type="button"
                       className="pet-upload-empty"
-                      disabled={!!busy || !!active}
+                      disabled={!!busy || !!active || !!pending}
                       onClick={() => inputs[i].current?.click()}
                     >
                       <span className="upload-plus">
@@ -424,7 +508,7 @@ export function Generator() {
                     type="file"
                     accept="image/jpeg,image/png"
                     ref={inputs[i]}
-                    disabled={!!busy || !!active}
+                    disabled={!!busy || !!active || !!pending}
                     onChange={(e) => choose(i, e.target.files?.[0])}
                   />
                 </div>
@@ -447,7 +531,7 @@ export function Generator() {
             <button
               type="button"
               onClick={samples}
-              disabled={!!busy || !!active}
+              disabled={!!busy || !!active || !!pending}
             >
               Try sample photos <ArrowUpRight size={14} />
             </button>
@@ -457,7 +541,7 @@ export function Generator() {
           <TemplatePicker
             templates={config.templates}
             selectedId={templateId}
-            disabled={!!busy || !!active}
+            disabled={!!busy || !!active || !!pending}
             onSelect={(id) => {
               setTemplateId(id);
               localStorage.setItem("smalltown-template", id);
@@ -475,6 +559,7 @@ export function Generator() {
                   disabled={
                     !!busy ||
                     !!active ||
+                    !!pending ||
                     (!config.mock && !config.resolutions.includes(r))
                   }
                   className={resolution === r ? "selected" : ""}
@@ -529,7 +614,9 @@ export function Generator() {
             {busy === "generate" ? (
               <>
                 <Loader2 className="spin" size={18} />
-                Preparing your duo…
+                {checkingInputs
+                  ? "Checking your inputs…"
+                  : "Uploading your photos…"}
               </>
             ) : active ? (
               <>
@@ -539,11 +626,13 @@ export function Generator() {
             ) : (
               <>
                 <Sparkles size={18} />
-                {!user
-                  ? "Sign in to create your video"
-                  : user.wallet.balance < SPECS[resolution].credits
-                    ? "Buy credits to create"
-                    : "Create Your AI Video"}
+                {pending
+                  ? "Resume saved request"
+                  : !user
+                    ? "Sign in to create your video"
+                    : user.wallet.balance < SPECS[resolution].credits
+                      ? "Buy credits to create"
+                      : "Create Your AI Video"}
                 <ArrowUpRight size={17} />
               </>
             )}
@@ -555,6 +644,13 @@ export function Generator() {
                 ? "14-second MP4 · template audio included"
                 : "Live generation is coming soon."}
           </p>
+          {pending && (
+            <p className="status-note" role="status">
+              Request saved · {Math.floor(elapsed / 60)}m {elapsed % 60}s
+              elapsed. You can refresh this page; we’ll restore this request
+              without uploading again.
+            </p>
+          )}
           {message && (
             <div
               className={checkingInputs ? "status-note" : "error"}
