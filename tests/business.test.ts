@@ -1081,6 +1081,20 @@ describe("durable safety gates", () => {
         "blocked",
       );
       expect((await wallet(u.id))?.balance).toBe(600);
+      await db
+        .prepare(
+          "UPDATE moderation_checks SET state='unavailable', error='PROVIDER_IMAGE_CORRUPT' WHERE id=?",
+        )
+        .bind(checks[1].id)
+        .run();
+      await expect(
+        moderateInputs(env, u.id, input(u.assets)),
+      ).rejects.toMatchObject({
+        status: 422,
+        code: "INPUT_IMAGE_CORRUPT",
+        assetId: u.assets[1],
+      });
+
       expect(
         (
           await db

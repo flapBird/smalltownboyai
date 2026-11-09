@@ -512,13 +512,24 @@ export async function runCheck(
     .bind(id)
     .first<Check>())!;
 }
-async function requirePass(e: Bindings, c: Check) {
+async function requirePass(e: Bindings, c: Check, assetId?: string) {
   const done = await runCheck(e, c.id);
   if (done.state === "blocked")
     throw new AppError(
       422,
       "Safety check blocked this content. Choose different photos or contact support.",
       "SAFETY_BLOCKED",
+    );
+  if (
+    done.state === "unavailable" &&
+    c.stage === "input" &&
+    done.error === "PROVIDER_IMAGE_CORRUPT"
+  )
+    throw new AppError(
+      422,
+      "The safety service could not decode one photo. Select that photo again to prepare a fresh PNG, then retry. No generation credits were charged.",
+      "INPUT_IMAGE_CORRUPT",
+      assetId,
     );
   if (done.state === "unavailable")
     throw new AppError(
@@ -600,6 +611,7 @@ export async function moderateInputs(
       await requirePass(
         e,
         await ensureCheck(e, owner, "input", a.id, "image", a),
+        a.id,
       ),
     );
   await requirePass(

@@ -69,6 +69,7 @@ export class AppError extends Error {
     public status: number,
     message: string,
     public code?: string,
+    public assetId?: string,
   ) {
     super(message);
   }

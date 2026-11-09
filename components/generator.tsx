@@ -18,6 +18,7 @@ import {
   readPendingGeneration,
   type PendingGeneration,
 } from "@/lib/generation-draft";
+import { normalizePhoto } from "@/lib/normalize-photo";
 import { TemplatePicker } from "./template-picker";
 import { Button } from "./ui/button";
 import { SPECS, type Resolution } from "@/lib/catalog";
@@ -46,7 +47,7 @@ async function api(path: string, body?: unknown) {
   if (!r.ok)
     throw Object.assign(
       new Error(d.error || "Something went wrong. Please try again."),
-      { code: d.code },
+      { code: d.code, assetId: d.assetId },
     );
   return d;
 }
@@ -303,7 +304,7 @@ export function Generator() {
         const f = await restoreDraft(String(i));
         if (!f) throw new Error("Please select your photos again.");
         const body = new FormData();
-        body.append("file", f);
+        body.append("file", await normalizePhoto(f));
         const r = await fetch("/api/uploads", {
           method: "POST",
           body,
@@ -381,9 +382,32 @@ export function Generator() {
         window.dispatchEvent(new Event("wallet-updated"));
       });
     } catch (e) {
-      const terminal = ["SAFETY_BLOCKED", "SAFETY_UNAVAILABLE"].includes(
-        (e as { code?: string }).code || "",
-      );
+      const corrupt = (e as { code?: string }).code === "INPUT_IMAGE_CORRUPT";
+      if (corrupt) {
+        const bad = (e as { assetId?: string }).assetId;
+        setPhotos((photos) =>
+          photos.map((photo, i) =>
+            photo
+              ? {
+                  ...photo,
+                  id:
+                    (i === 0 ? saved.payload.assetA : saved.payload.assetB) ===
+                    bad
+                      ? undefined
+                      : i === 0
+                        ? saved.payload.assetA
+                        : saved.payload.assetB,
+                }
+              : photo,
+          ),
+        );
+        key.current = null;
+      }
+      const terminal = [
+        "SAFETY_BLOCKED",
+        "SAFETY_UNAVAILABLE",
+        "INPUT_IMAGE_CORRUPT",
+      ].includes((e as { code?: string }).code || "");
       if (terminal) {
         localStorage.removeItem(PENDING_GENERATION_KEY);
         setPending(null);
