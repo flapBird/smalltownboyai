@@ -71,8 +71,9 @@ const videoFrame = z.object({
   frame_number: z.number().int().nonnegative(),
   timestamp_seconds: z.number().finite().nonnegative().max(30),
   nsfw_detected: z.boolean(),
-  nsfw: labels,
-  special: special.optional(),
+  // Video reports use free-form labels, unlike Image 2.0 categories.
+  nsfw: z.array(z.string()),
+  special: z.array(z.string()).optional(),
 });
 
 // A valid execution envelope is not an approval. Missing/contradictory results fail closed.
@@ -170,9 +171,7 @@ export function verdict(
       count !== o.flagged_frame_count ||
       o.nsfw_detected !== count > 0 ||
       d.flagged !== o.nsfw_detected ||
-      o.frames.some(
-        (f) => !f.nsfw_detected && (f.nsfw.length || f.special?.length),
-      )
+      o.frames.some((f) => !f.nsfw_detected && f.nsfw.length)
     )
       throw new Error("INCOMPLETE_VIDEO");
     flagged = d.flagged;

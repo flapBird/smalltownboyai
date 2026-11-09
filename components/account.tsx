@@ -385,7 +385,13 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
               <h3>
                 {v.status === "completed"
                   ? "Ready for its close-up"
-                  : v.status.replaceAll("_", " ")}
+                  : v.status === "review"
+                    ? v.error_code === "SAFETY_BLOCKED"
+                      ? "Flagged by safety checks"
+                      : v.error_code === "SAFETY_UNAVAILABLE"
+                        ? "Safety check needs attention"
+                        : "Checking video safety"
+                    : v.status.replaceAll("_", " ")}
               </h3>
               <p>
                 {v.template_id

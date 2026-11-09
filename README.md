@@ -107,7 +107,7 @@ npx wrangler deploy --config dist/server/wrangler.json --dry-run
 npx wrangler deploy --config wrangler.jobs.jsonc --dry-run
 ```
 
-当前验证记录包含 86 项通过的测试，以及类型检查、Vinext 兼容性、生产构建和两个 Worker 的部署预检。`--dry-run` 不执行发布，也不能替代云端验收。使用 `npm run preview` 可在本地预览生产构建。
+当前验证记录包含 87 项通过的测试，以及类型检查、Vinext 兼容性、生产构建和两个 Worker 的部署预检。`--dry-run` 不执行发布，也不能替代云端验收。使用 `npm run preview` 可在本地预览生产构建。
 
 `npm run db:generate` 用于检查 Drizzle 模型差异；自定义触发器位于独立 SQL 迁移中，使用 Wrangler 按顺序应用，不使用 `drizzle-kit push` 绕过迁移。迁移 SQL 与 Drizzle journal 均需保留。
 

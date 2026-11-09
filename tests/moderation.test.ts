@@ -177,6 +177,43 @@ describe("strict moderation verdicts", () => {
       ).state,
     ).toBe("blocked");
   });
+  it("parses video free-form labels and auxiliary special labels as a blocked assessment", () => {
+    const e = {
+      ...expected,
+      model: "video-nsfw-filter",
+      endpoint: "video-moderation",
+    };
+    const frames = Array.from({ length: 16 }, (_, i) => ({
+      frame_number: i * 23 + 1,
+      timestamp_seconds: i * 0.9,
+      nsfw_detected: i < 6,
+      nsfw: i < 6 ? ["sexual", "nsfw", "porn", "nipples"] : [],
+      special: i < 6 || i === 14 ? ["little girl", "young child"] : [],
+    }));
+    const output = {
+      nsfw_detected: true,
+      scope: "sampled_frames",
+      sampling_complete: true,
+      checked_frames: 16,
+      timestamp_source: "frame_index_div_fps_estimate",
+      output_layout: "named-files-v1",
+      report_schema_version: 5,
+      flagged_frame_count: 6,
+      frames,
+    };
+    const result = {
+      ...text(),
+      ...e,
+      consumed_credits: 0.66,
+      result: { type: "json", data: { flagged: true, output } },
+    };
+    expect(verdict(result, e)).toMatchObject({ state: "blocked", usage: 0.66 });
+    output.flagged_frame_count = 5;
+    expect(() => verdict(result, e)).toThrow("INCOMPLETE_VIDEO");
+    output.flagged_frame_count = 6;
+    (frames[0].nsfw as unknown[]) = [null];
+    expect(() => verdict(result, e)).toThrow();
+  });
   it("rejects missing or excessive MP4 durations", () => {
     expect(() => mp4Duration(new Uint8Array(12))).toThrow();
     const bytes = new Uint8Array(36),

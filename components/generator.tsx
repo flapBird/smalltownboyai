@@ -434,6 +434,9 @@ export function Generator() {
       }
     }
   }
+  const safetyHold =
+    task?.status === "review" &&
+    ["SAFETY_BLOCKED", "SAFETY_UNAVAILABLE"].includes(task.error_code || "");
   const active = task && !["completed", "failed"].includes(task.status);
   useEffect(() => {
     const select = (event: Event) => {
@@ -675,8 +678,8 @@ export function Generator() {
               </>
             ) : active ? (
               <>
-                <Loader2 className="spin" size={18} />
-                Task {task.status}
+                <Loader2 className={safetyHold ? "" : "spin"} size={18} />
+                {safetyHold ? "Video held for review" : `Task ${task.status}`}
               </>
             ) : (
               <>
@@ -733,14 +736,18 @@ export function Generator() {
             ) : (
               <div className="studio-progress">
                 <Loader2
-                  className={task.status === "failed" ? "" : "spin"}
+                  className={
+                    task.status === "failed" || safetyHold ? "" : "spin"
+                  }
                   size={34}
                 />
                 <span>
                   {task.status === "failed"
                     ? "This one missed a beat"
                     : task.status === "review"
-                      ? "Checking your video"
+                      ? safetyHold
+                        ? "Video held for review"
+                        : "Checking your video"
                       : task.status === "unknown"
                         ? "Checking your submission"
                         : "Your duo is taking shape"}
@@ -753,7 +760,9 @@ export function Generator() {
             <h3>
               {task.status === "completed"
                 ? "Ready for its close-up."
-                : "A little dance in the making."}
+                : safetyHold
+                  ? "Your video needs review."
+                  : "A little dance in the making."}
             </h3>
             <p>
               {task.status === "failed"
@@ -764,7 +773,7 @@ export function Generator() {
                     : "Your private video is ready to download."
                   : task.status === "review"
                     ? task.error_code === "SAFETY_BLOCKED"
-                      ? "Safety checks flagged this video. It remains private; contact support for review."
+                      ? "Automated safety checks flagged this video. It is not still generating. The video remains private; contact support if you believe this is a mistake."
                       : task.error_code === "SAFETY_UNAVAILABLE"
                         ? "Safety checks could not finish. Your video remains private; contact support for review."
                         : "Checking your video automatically. It will be ready to download when checks pass."
