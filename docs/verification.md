@@ -131,3 +131,9 @@ AUP 增加 CSAM/儿童不安全内容及 NCII 专项零容忍条款。实际生�
 在实际 Miniflare/workerd 复现：Workers 不支持 `redirect: "error"`，构造请求即抛 TypeError，原审核代码把它归为 TRANSPORT_RETRY，因此请求没有到达 SeeAPI。成片下载存在同样参数，已一并改为 `manual`；3xx 仍作为失败处理，不跟随 Location，不转发凭据。官方依据：https://developers.cloudflare.com/workers/runtime-apis/request/#constructor 。
 
 新增实际 Workers Request 构造回归测试，并验证 302 只请求一次且不通过检测。78 项测试、类型检查和生产构建通过。未调用收费推理、修改线上密钥或变量。检查确认项目不存在 llms.txt。需部署 Web 和 Jobs 两个 Worker 后才生效；已超时的历史检测仍保持失败关闭，不自动重置或放行。
+
+## 2026-11-09 供应商失败终态诊断
+
+线上只读核对：新一轮第一张输入图已 passed，第二张已取得供应商任务 ID 后进入 unavailable/PROVIDER_TERMINAL。这不同于此前请求构造失败；当前数据库未保存供应商详细原因，不能推断是照片违规、下载失败或额度问题。历史详细原因需在 SeeAPI 查询既有任务，不能用重新上传重复收费来代替诊断。
+
+现已保存经过长度与字符校验的供应商错误码（不存原始消息和签名链接），用户提示附本站检测记录短编号及对应检测阶段。79 项测试、类型检查与 diff 检查通过；未调用收费检测、修改线上配置或部署。检查无 llms.txt。

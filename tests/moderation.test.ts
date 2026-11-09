@@ -25,6 +25,30 @@ const text = () => ({
   },
 });
 describe("strict moderation verdicts", () => {
+  it("preserves terminal provider codes without exposing messages or URLs", () => {
+    const failed = {
+      ...text(),
+      status: "failed",
+      result: null,
+      error: { code: "image_download_failed", message: "private signed URL" },
+    };
+    expect(verdict(failed, expected)).toMatchObject({
+      state: "unavailable",
+      error: "PROVIDER_image_download_failed",
+    });
+    expect(JSON.stringify(verdict(failed, expected))).not.toContain(
+      "private signed URL",
+    );
+    expect(
+      verdict(
+        {
+          ...failed,
+          error: { code: "https://private.invalid/?signature=secret" },
+        },
+        expected,
+      ).error,
+    ).toBe("PROVIDER_FAILED");
+  });
   it("accepts a complete clean text and rejects missing categories and mismatched identity", () => {
     expect(verdict(text(), expected).state).toBe("passed");
     const missing = text();

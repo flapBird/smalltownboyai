@@ -79,7 +79,7 @@ const videoFrame = z.object({
 export function verdict(
   raw: unknown,
   expected: Pick<Check, "provider_id" | "model" | "endpoint">,
-): { id: string; state: string; usage?: number } {
+): { id: string; state: string; usage?: number; error?: string } {
   const e = envelope.parse(raw);
   if (
     (expected.provider_id && e.id !== expected.provider_id) ||
@@ -89,8 +89,20 @@ export function verdict(
     throw new Error("IDENTITY_MISMATCH");
   if (e.status === "queued" || e.status === "processing")
     return { id: e.id, state: "pending" };
-  if (e.status !== "succeeded" || e.error !== null)
-    return { id: e.id, state: "unavailable", usage: e.consumed_credits };
+  if (e.status !== "succeeded" || e.error !== null) {
+    // Persist only a bounded machine code, never provider messages or media URLs.
+    const failure = z
+      .object({ code: z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/) })
+      .safeParse(e.error);
+    return {
+      id: e.id,
+      state: "unavailable",
+      usage: e.consumed_credits,
+      error: failure.success
+        ? `PROVIDER_${failure.data.code}`
+        : `PROVIDER_${e.status.toUpperCase()}`,
+    };
+  }
   const result = z
     .object({ type: z.literal("json"), data: z.unknown() })
     .parse(e.result);
@@ -482,7 +494,7 @@ export async function runCheck(
         provider = v.id;
         state = v.state;
         usage = v.usage ?? null;
-        if (state === "unavailable") error = "PROVIDER_TERMINAL";
+        if (state === "unavailable") error = v.error ?? "PROVIDER_TERMINAL";
       } catch {
         state = "unavailable";
         error = "INVALID_RESULT";
@@ -511,7 +523,7 @@ async function requirePass(e: Bindings, c: Check) {
   if (done.state === "unavailable")
     throw new AppError(
       503,
-      "Safety checks could not finish. Contact support; this is not a content rejection.",
+      `${c.stage === "template" ? "The template safety check" : c.stage === "output" ? "The video safety check" : "A photo safety check"} could not finish. This is a service error, not a content rejection. Contact support with reference ${done.id.slice(0, 12)}.`,
       "SAFETY_UNAVAILABLE",
     );
   if (done.state !== "passed")
