@@ -440,6 +440,7 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
       await rateLimit(e.DB, "task:" + u.id, 5, 60);
       const b = z
         .object({
+          subjectMode: z.enum(["human", "pet"]).default("pet"),
           assetA: z.string().uuid(),
           assetB: z.string().uuid(),
           resolution: z.enum(["480p", "768p", "1080p"]),
@@ -504,6 +505,7 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
             ).submitTask({
               video: templateURL,
               images: checkedURLs,
+              subjectMode: b.subjectMode,
               resolution: b.resolution,
               inputDuration: result.task.input_duration,
             });

@@ -1,6 +1,11 @@
 import { SPECS, type Resolution } from "../catalog";
 export const H3_PROMPT =
   "Replace the foreground character with the pet in the first reference image and the background character with the pet in the second reference image. Preserve each pet identity, the original camera rhythm, exaggerated reaction, background dance, playful interaction and final two-character dance. Nonhuman pets only. Preserve the source audio and its timing. Do not add text.";
+export type SubjectMode = "human" | "pet";
+export function generationPrompt(mode: SubjectMode = "pet") {
+  if (mode === "pet") return H3_PROMPT;
+  return "Replace BOTH original subjects in the source video with the two consenting adults shown in the reference images. Reference image 1 is the foreground performer; reference image 2 is the background performer. Keep each person's face, hair and identity recognizable and distinct throughout every shot. Use natural human bodies, clothing and hands, not animal bodies or costumes. Remove the original animal subjects completely. Transfer only the source choreography, camera movement, timing and environment. Preserve source audio and timing. Do not return the unchanged source video. Do not add text.";
+}
 export const H3_MODEL = "wavespeed-ai/minimax-h3/video-edit";
 export function estimateCost(inputDuration: number, resolution: Resolution) {
   // Input rounds up; output is explicitly set to the same integer duration. Two images.
@@ -9,6 +14,7 @@ export function estimateCost(inputDuration: number, resolution: Resolution) {
   );
 }
 export interface GenerationInput {
+  subjectMode?: SubjectMode;
   video: string;
   images: [string, string];
   resolution: Resolution;
@@ -50,7 +56,8 @@ export class WaveSpeed implements VideoGenerationProvider {
   }
   async submitTask(i: GenerationInput) {
     this.validateInput(i);
-    const r = await this.transport(
+    const r = await this.transport.call(
+      globalThis,
       "https://api.wavespeed.ai/api/v3/" + H3_MODEL,
       {
         method: "POST",
@@ -66,7 +73,7 @@ export class WaveSpeed implements VideoGenerationProvider {
           duration: i.inputDuration,
           aspect_ratio: "9:16",
           generate_audio: false,
-          prompt: H3_PROMPT,
+          prompt: generationPrompt(i.subjectMode),
         }),
       },
     );
@@ -76,7 +83,8 @@ export class WaveSpeed implements VideoGenerationProvider {
     return body.data.id;
   }
   async queryTask(id: string) {
-    const r = await this.transport(
+    const r = await this.transport.call(
+      globalThis,
       "https://api.wavespeed.ai/api/v3/predictions/" +
         encodeURIComponent(id) +
         "/result",
@@ -85,7 +93,7 @@ export class WaveSpeed implements VideoGenerationProvider {
         signal: AbortSignal.timeout(15000),
       },
     );
-    if (!r.ok) throw new Error("Provider query failed.");
+    if (!r.ok) throw new Error("PROVIDER_QUERY_HTTP_" + r.status);
     return this.normalizeResult(await r.json());
   }
   normalizeResult(raw: unknown): ProviderResult {

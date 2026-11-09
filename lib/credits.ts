@@ -7,6 +7,7 @@ export interface TaskRow {
   user_id: string;
   request_key: string;
   status: string;
+  subject_mode: "human" | "pet";
   resolution: Resolution;
   credits: number;
   asset_a: string;
@@ -32,6 +33,7 @@ export async function reserveTask(
   userId: string,
   input: {
     requestKey: string;
+    subjectMode?: "human" | "pet";
     assetA: string;
     assetB: string;
     resolution: Resolution;
@@ -47,6 +49,7 @@ export async function reserveTask(
     if (existing.deleted_at)
       throw new AppError(409, "This task was deleted. Start a new request.");
     if (
+      existing.subject_mode !== (input.subjectMode ?? "pet") ||
       existing.asset_a !== input.assetA ||
       existing.asset_b !== input.assetB ||
       existing.resolution !== input.resolution ||
@@ -64,8 +67,8 @@ export async function reserveTask(
   await db.batch([
     db
       .prepare(
-        `INSERT OR IGNORE INTO video_tasks (id,user_id,request_key,status,resolution,credits,asset_a,asset_b,provider,model,template_id,template_version,input_duration,estimated_cost,created_at,updated_at)
- SELECT ?,?,?,'queued',?,?,?,?,?,?,?,?,?,?,?,? FROM user_wallets w WHERE w.user_id=? AND w.balance>=? AND w.tier>=?
+        `INSERT OR IGNORE INTO video_tasks (id,user_id,request_key,status,resolution,credits,asset_a,asset_b,provider,model,template_id,template_version,input_duration,estimated_cost,created_at,updated_at,subject_mode)
+ SELECT ?,?,?,'queued',?,?,?,?,?,?,?,?,?,?,?,?,? FROM user_wallets w WHERE w.user_id=? AND w.balance>=? AND w.tier>=?
  AND (SELECT COUNT(*) FROM video_tasks WHERE user_id=? AND status NOT IN ('completed','failed'))<2
  AND (SELECT value FROM settings WHERE key='generation_paused')='false'
  AND EXISTS (SELECT 1 FROM media_assets WHERE id=? AND user_id=? AND moderation='approved')
@@ -87,6 +90,7 @@ export async function reserveTask(
         mock ? 0 : estimateCost(template.duration, input.resolution),
         now,
         now,
+        input.subjectMode ?? "pet",
         userId,
         spec.credits,
         spec.tier,

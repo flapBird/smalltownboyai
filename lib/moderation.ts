@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Bindings } from "./env";
 import { AppError } from "./auth";
 import { imageInfo, signature, validSignature } from "./media";
-import { H3_PROMPT } from "./providers/wavespeed";
+import { generationPrompt, type SubjectMode } from "./providers/wavespeed";
 import { SPECS, type Resolution } from "./catalog";
 import { getTemplate } from "./templates";
 import { settleTask, type TaskRow } from "./credits";
@@ -549,6 +549,7 @@ export async function moderateInputs(
   e: Bindings,
   owner: string,
   b: {
+    subjectMode?: SubjectMode;
     assetA: string;
     assetB: string;
     resolution: Resolution;
@@ -604,7 +605,7 @@ export async function moderateInputs(
     { key: template.objectKey, etag: template.etag },
     "video",
   );
-  await screenPrompt(e, H3_PROMPT);
+  await screenPrompt(e, generationPrompt(b.subjectMode));
   const checked = [];
   for (const a of assets)
     checked.push(
@@ -645,10 +646,24 @@ export async function moderateOutput(e: Bindings, t: TaskRow, poll = true) {
   if (!t.output_key) throw new AppError(404, "Output missing.");
   const head = await e.MEDIA.head(t.output_key);
   if (!head) throw new AppError(404, "Output missing.");
-  const c = await ensureCheck(e, t.user_id, "output", t.id, "video", {
+  let c = await ensureCheck(e, t.user_id, "output", t.id, "video", {
     key: t.output_key,
     etag: head.etag,
   });
+  // A definitive URL rejection may be retried once with a fresh signed URL.
+  // Preserve the original provider request and key; never reset an ambiguous check.
+  if (c.state === "unavailable" && c.error === "PROVIDER_MEDIA_URL_INVALID")
+    c = await ensureCheck(
+      e,
+      t.user_id,
+      "output",
+      t.id + ":media-url-retry",
+      "video",
+      {
+        key: t.output_key,
+        etag: head.etag,
+      },
+    );
   return poll ? requirePass(e, c) : c;
 }
 export async function approvedOutputEtag(e: Bindings, t: TaskRow) {
@@ -680,9 +695,9 @@ export async function reconcileModeration(e: Bindings) {
     .run();
   if (!e.SEEAPI_API_KEY || !e.MEDIA_SIGNING_SECRET) return;
   const outputs = await e.DB.prepare(
-    "SELECT * FROM video_tasks WHERE provider='wavespeed' AND status='review' AND output_key IS NOT NULL AND NOT EXISTS (SELECT 1 FROM moderation_checks c WHERE c.asset_key=video_tasks.output_key AND c.policy=? ) ORDER BY updated_at LIMIT 10",
+    "SELECT * FROM video_tasks WHERE provider='wavespeed' AND status='review' AND output_key IS NOT NULL AND (NOT EXISTS (SELECT 1 FROM moderation_checks c WHERE c.asset_key=video_tasks.output_key AND c.policy=? ) OR EXISTS (SELECT 1 FROM moderation_checks c WHERE c.asset_key=video_tasks.output_key AND c.stage='output' AND c.state='unavailable' AND c.error='PROVIDER_MEDIA_URL_INVALID' AND c.policy=? AND NOT EXISTS (SELECT 1 FROM moderation_checks other WHERE other.asset_key=c.asset_key AND other.stage='output' AND other.policy=c.policy AND other.id<>c.id))) ORDER BY updated_at LIMIT 10",
   )
-    .bind(POLICY)
+    .bind(POLICY, POLICY)
     .all<TaskRow>();
   for (const t of outputs.results) {
     try {

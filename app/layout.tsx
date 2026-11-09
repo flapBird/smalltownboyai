@@ -10,14 +10,16 @@ export const metadata: Metadata = {
       { url: "/favicon.ico", sizes: "16x16 32x32 48x48", type: "image/x-icon" },
       { url: "/icon.svg", sizes: "any", type: "image/svg+xml" },
     ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   title: {
-    default: "Smalltown Boy AI Generator – Create Cat Dance Videos",
+    default: "Smalltown Boy AI Generator – Turn Two Photos into Dance Videos",
     template: "%s | Smalltown Boy AI",
   },
   description:
-    "Explore Smalltown Boy-inspired AI pet dance videos. Upload two pet photos and preview our focused video generator. Live generation is coming soon.",
+    "Turn photos of yourself and a consenting friend, or your pets, into a Smalltown Boy-inspired AI dance video. Choose Human duo or Pet duo.",
   openGraph: {
     type: "website",
     siteName: "Smalltown Boy AI",

@@ -54,11 +54,11 @@ export const LEGAL: Record<
     sections: [
       [
         "The service",
-        "The service focuses on AI animation of pets and fictional nonhuman characters. Results can vary in appearance, motion and consistency. No promise of virality, exact identity matching or a fixed turnaround time is made.",
+        "The service offers separate dance-video modes for consenting adults and pets. Results can vary in appearance, motion and consistency. No promise of virality, exact identity matching or a fixed turnaround time is made.",
       ],
       [
         "Your content",
-        "You must own or have permission to upload all source content and grant permission to process it for your requested generation. Do not upload real people, confidential information or prohibited content. See the Acceptable Use Policy.",
+        "You must own or have permission to upload all source content and grant permission to process it for your requested generation. Only upload adults with their explicit consent, or pets. Do not upload minors, confidential information or prohibited content. See the Acceptable Use Policy.",
       ],
       [
         "Credits",
@@ -66,7 +66,7 @@ export const LEGAL: Record<
       ],
       [
         "Your responsibilities and breaches",
-        "You are responsible for the content you submit, having the necessary rights and permissions, and how you use or share generated results. Uploading unauthorized material, real people, prohibited or illegal content, or using the service for fraud, abuse or other prohibited activity breaches these terms. Attempts to evade safety checks, misuse payment or refund systems, or interfere with the service are also breaches. You must stop the offending activity and cooperate with reasonable requests to resolve it. You may be responsible for loss or third-party claims caused by your unlawful conduct or breach to the extent established under applicable law; this does not exclude our own responsibilities or your mandatory consumer rights.",
+        "You are responsible for the content you submit, having the necessary rights and permissions, and how you use or share generated results. Uploading unauthorized material, depictions of minors or non-consenting people, prohibited or illegal content, or using the service for fraud, abuse or other prohibited activity breaches these terms. Attempts to evade safety checks, misuse payment or refund systems, or interfere with the service are also breaches. You must stop the offending activity and cooperate with reasonable requests to resolve it. You may be responsible for loss or third-party claims caused by your unlawful conduct or breach to the extent established under applicable law; this does not exclude our own responsibilities or your mandatory consumer rights.",
       ],
       [
         "Warnings, restrictions and termination",
@@ -120,15 +120,15 @@ export const LEGAL: Record<
   "acceptable-use": {
     title: "Acceptable Use Policy",
     intro:
-      "Make something playful, with permission. This first version is exclusively for pets and fictional nonhuman characters.",
+      "Make something playful, with permission. Choose Human duo for consenting adults or Pet duo for pets.",
     sections: [
       [
         "Allowed content",
-        "Use pet photographs and fictional characters you have rights to use. Keep content nonsexual, nonviolent and suitable for a general audience. Clearly identify shared output as AI-generated.",
+        "Use photographs of yourself and other consenting adults, or pets, that you have rights to use. All people depicted must be 18 or older and explicitly consent to the AI video. Keep content nonsexual, nonviolent and suitable for a general audience. Clearly identify shared output as AI-generated.",
       ],
       [
         "Prohibited content",
-        "Do not submit real people, face swaps, public figures, impersonations, sexual content, exploitation, abuse, graphic violence, hateful material, fraud, illegal content or content that infringes someone else’s privacy or intellectual property.",
+        "Do not submit minors, people without their consent, public figures, deceptive impersonations, sexual content, exploitation, abuse, graphic violence, hateful material, fraud, illegal content or content that infringes someone else’s privacy or intellectual property.",
       ],
       [
         "Child safety — zero tolerance",
@@ -136,7 +136,7 @@ export const LEGAL: Record<
       ],
       [
         "Non-consensual intimate imagery — zero tolerance",
-        "We have zero tolerance for non-consensual intimate imagery (NCII). Do not upload, request, generate or share intimate or sexual depictions of a person without their explicit consent, including synthetic sexual deepfakes, nudification, intimate image manipulation, revenge pornography, or threats to distribute such content. Claimed consent does not override our broader prohibition on real-person uploads and sexual content.",
+        "We have zero tolerance for non-consensual intimate imagery (NCII). Do not upload, request, generate or share intimate or sexual depictions of a person without their explicit consent, including synthetic sexual deepfakes, nudification, intimate image manipulation, revenge pornography, or threats to distribute such content. Claimed consent does not override our broader prohibition on sexual content.",
       ],
       [
         "Review and enforcement",

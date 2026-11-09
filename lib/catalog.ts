@@ -42,23 +42,23 @@ export const TIER_NAMES = ["Free", "Lite", "Standard", "Pro"];
 export const FAQ = [
   [
     "What is Smalltown Boy AI?",
-    "A focused pet-video project inspired by the two-character Smalltown Boy dance format. Upload one photo for each character to create an expressive, vertical AI dance clip. The service is currently in preview; paid generation is not available yet.",
+    "A two-photo dance video project inspired by the two-character Smalltown Boy dance format. Upload one photo for each character to create an expressive, vertical AI dance clip.",
   ],
   [
     "How do I make a Smalltown Boy AI video?",
-    "Choose a dance template and two clear pet photos, one per character. Select a supported resolution, sign in with Google and review the credit cost before generating. In this local preview, you can explore the full flow with test credits without paying.",
+    "Choose a dance template and two clear photos of consenting adults or pets, one per character. Select a supported resolution, sign in with Google and review the credit cost before generating. Select Human duo for people or Pet duo for pets.",
   ],
   [
-    "Can I use my own cat or other pet photos?",
-    "Yes. Use JPG or PNG images you own or have permission to use. Each image must be under 8 MB and between 256 and 4096 pixels per side, with at least 78,400 pixels in total. This version is for pets and fictional nonhuman characters only.",
+    "Can I use photos of myself, friends or pets?",
+    "Yes. Use JPG or PNG images you own or have permission to use. Each image must be under 8 MB and between 256 and 4096 pixels per side, with at least 78,400 pixels in total. Choose Human duo for two consenting adults (18+), or Pet duo for two pets. Do not use anyone’s photo without their permission.",
   ],
   [
     "How long is the video, and which resolutions are supported?",
-    "Our target is a 14-second vertical MP4 in 480p, 768p or 1080p. Final availability depends on a licensed reference clip and real API validation. These specifications are not yet offered as a live service.",
+    "The generator requests a 14-second vertical MP4 in 480p, 768p or 1080p. The studio shows the templates and resolutions currently enabled for your account.",
   ],
   [
     "How many credits will a video cost?",
-    "Planned costs are 100 credits for 480p, 200 for 768p and 400 for 1080p. Credits do not expire. Resolution access depends on your highest eligible purchase, separately from your current balance.",
+    "Generation costs are 100 credits for 480p, 200 for 768p and 400 for 1080p. Credits do not expire. Resolution access depends on your highest eligible purchase, separately from your current balance.",
   ],
   [
     "How long does generation take?",
@@ -66,7 +66,7 @@ export const FAQ = [
   ],
   [
     "Can I download the result, and is music included?",
-    "Completed videos are intended to be downloadable as private MP4 files. The local preview provides a clearly marked test animation. Live results preserve the selected template’s cleared audio. The original song is not promised; no separate music rights are granted.",
+    "Videos that complete generation and pass safety checks are downloadable as private MP4 files. The local preview provides a clearly marked test animation. Live results preserve the selected template’s cleared audio. The original song is not promised; no separate music rights are granted.",
   ],
   [
     "What happens if generation fails?",

@@ -549,6 +549,47 @@ describe("recovery and deletion regressions", () => {
     await expect(reserveTask(db, u.id, b, true)).rejects.toThrow("deleted");
     expect(await wallet(u.id)).toMatchObject({ balance: 500, reserved: 0 });
   });
+  it("retains the existing task and reports missing output host configuration", async () => {
+    const u = await user();
+    const { task } = await reserveTask(db, u.id, input(u.assets), false);
+    await db
+      .prepare(
+        "UPDATE video_tasks SET status='processing',provider_task_id='finished-provider' WHERE id=?",
+      )
+      .bind(task.id)
+      .run();
+    const transport = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (url) => {
+        expect(String(url)).toContain("/predictions/");
+        const id = String(url).split("/predictions/")[1].split("/")[0];
+        return Response.json({
+          data: {
+            id,
+            status: "completed",
+            outputs: ["https://output.example.test/result.mp4"],
+          },
+        });
+      });
+    try {
+      await reconcile({ ...e, WAVESPEED_API_KEY: "fake", OUTPUT_HOSTS: "" });
+      expect(
+        await db
+          .prepare("SELECT status,error_code FROM video_tasks WHERE id=?")
+          .bind(task.id)
+          .first(),
+      ).toEqual({
+        status: "processing",
+        error_code: "OUTPUT_HOSTS_NOT_CONFIGURED",
+      });
+      expect((await wallet(u.id))?.reserved).toBe(100);
+      expect(
+        await e.MEDIA.head("outputs/" + u.id + "/" + task.id + ".mp4"),
+      ).toBeNull();
+    } finally {
+      transport.mockRestore();
+    }
+  });
   it("releases an abandoned queue reservation exactly once", async () => {
     const u = await user();
     const { task } = await reserveTask(db, u.id, input(u.assets), true);
@@ -1107,7 +1148,14 @@ describe("durable safety gates", () => {
         .prepare("UPDATE moderation_checks SET state='passed' WHERE id=?")
         .bind(checks[1].id)
         .run();
-      expect(await moderateInputs(env, u.id, input(u.assets))).toHaveLength(2);
+      expect(
+        await moderateInputs(env, u.id, {
+          ...input(u.assets),
+          subjectMode: "human",
+        }),
+      ).toHaveLength(2);
+      const { generationPrompt } = await import("../lib/providers/wavespeed");
+      expect(prompt).toHaveBeenLastCalledWith(env, generationPrompt("human"));
       const { task } = await reserveTask(db, u.id, input(u.assets), false);
       expect(task.status).toBe("queued");
       expect((await wallet(u.id))?.reserved).toBe(100);
@@ -1763,4 +1811,54 @@ it("admin generation settings override legacy variables and enforce per-template
       .prepare("DELETE FROM settings WHERE key='generation_config'")
       .run();
   }
+});
+
+it("persists subject mode and rejects changing it under the same credit reservation", async () => {
+  const u = await user();
+  const payload = { ...input(u.assets), subjectMode: "human" as const };
+  const result = await reserveTask(db, u.id, payload, true);
+  expect(result.task.subject_mode).toBe("human");
+  expect((await reserveTask(db, u.id, payload, true)).created).toBe(false);
+  await expect(
+    reserveTask(db, u.id, { ...payload, subjectMode: "pet" }, true),
+  ).rejects.toThrow();
+  expect(await wallet(u.id)).toMatchObject({ balance: 500, reserved: 100 });
+});
+
+it("retries a definitively rejected output URL once with a distinct durable check", async () => {
+  const { moderateOutput } = await import("../lib/moderation");
+  const env = {
+    ...e,
+    APP_ORIGIN: "https://smalltownboyai.one",
+    SEEAPI_API_KEY: "test",
+    MEDIA_SIGNING_SECRET: "test",
+  };
+  const u = await user();
+  const { task } = await reserveTask(db, u.id, input(u.assets), false);
+  task.output_key = "outputs/" + task.id + ".mp4";
+  await e.MEDIA.put(task.output_key, readFileSync("public/fixtures/mock.mp4"));
+  const original = await moderateOutput(env, task, false);
+  await db
+    .prepare(
+      "UPDATE moderation_checks SET state='unavailable',error='PROVIDER_MEDIA_URL_INVALID' WHERE id=?",
+    )
+    .bind(original.id)
+    .run();
+  const retry = await moderateOutput(env, task, false);
+  expect(retry.id).not.toBe(original.id);
+  expect(retry.body).not.toBe(original.body);
+  expect((await moderateOutput(env, task, false)).id).toBe(retry.id);
+  await db
+    .prepare(
+      "UPDATE moderation_checks SET state='unavailable',error='PROVIDER_MEDIA_URL_INVALID' WHERE id=?",
+    )
+    .bind(retry.id)
+    .run();
+  expect((await moderateOutput(env, task, false)).id).toBe(retry.id);
+  const old = await db
+    .prepare("SELECT body,state FROM moderation_checks WHERE id=?")
+    .bind(original.id)
+    .first();
+  expect(old).toEqual({ body: original.body, state: "unavailable" });
+  expect(await wallet(u.id)).toMatchObject({ balance: 500, reserved: 100 });
 });

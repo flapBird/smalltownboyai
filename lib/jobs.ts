@@ -8,6 +8,7 @@ async function saveOutput(e: Bindings, t: TaskRow, url: string) {
     .split(",")
     .map((v) => v.trim())
     .filter(Boolean);
+  if (!allowed.length) throw new Error("OUTPUT_HOSTS_NOT_CONFIGURED");
   if (
     u.protocol !== "https:" ||
     !allowed.includes(u.hostname) ||
@@ -63,7 +64,8 @@ export async function reconcile(e: Bindings) {
       .first();
     if (!lease) continue;
     try {
-      if (!t.provider_task_id || !e.WAVESPEED_API_KEY) continue;
+      if (!t.provider_task_id || !e.WAVESPEED_API_KEY)
+        throw new Error("JOBS_CONFIGURATION_MISSING");
       const r = await new WaveSpeed(e.WAVESPEED_API_KEY).queryTask(
         t.provider_task_id,
       );
@@ -77,11 +79,26 @@ export async function reconcile(e: Bindings) {
         )
           .bind(Date.now(), t.id)
           .run();
-    } catch {
+    } catch (error) {
+      const reason =
+        (error instanceof Error &&
+          [
+            "OUTPUT_HOSTS_NOT_CONFIGURED",
+            "OUTPUT_HOST_NOT_ALLOWED",
+            "OUTPUT_DOWNLOAD_FAILED",
+            "OUTPUT_TOO_LARGE",
+            "INVALID_MP4",
+            "PROVIDER_ID_MISMATCH",
+            "JOBS_CONFIGURATION_MISSING",
+          ].includes(error.message)) ||
+        (error instanceof Error &&
+          /^PROVIDER_QUERY_HTTP_\d{3}$/.test(error.message))
+          ? error.message
+          : "RECONCILIATION_RETRY";
       await e.DB.prepare(
-        "UPDATE video_tasks SET error_code='RECONCILIATION_RETRY',updated_at=? WHERE id=? AND status='processing'",
+        "UPDATE video_tasks SET error_code=?,updated_at=? WHERE id=? AND status='processing'",
       )
-        .bind(Date.now(), t.id)
+        .bind(reason, Date.now(), t.id)
         .run();
     }
   }

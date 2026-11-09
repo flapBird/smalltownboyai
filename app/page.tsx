@@ -23,15 +23,15 @@ export default function Home() {
             <h2 id="what-title">What is Smalltown Boy AI?</h2>
           </div>
           <div className="product-intro-copy">
-            <p className="intro-lead">Your pets. The starring roles.</p>
+            <p className="intro-lead">Your photos. The starring roles.</p>
             <p>
-              Smalltown Boy AI is a two-photo dance video maker for pets and
-              fictional nonhuman characters. Choose a scene and give each
-              character a photo: one takes the foreground close-up, while the
-              other dances in the background.
+              Smalltown Boy AI is a two-photo dance video maker for you, a
+              consenting adult friend, or your pets. Choose a scene and give
+              each character a photo: one takes the foreground close-up, while
+              the other dances in the background.
             </p>
             <p>
-              The planned output is a 14-second vertical video inspired by the
+              The generator requests a 14-second vertical video inspired by the
               Smalltown Boy dance trend. The template provides the choreography,
               so you don’t need to write a prompt or edit a timeline.
             </p>
@@ -55,7 +55,7 @@ export default function Home() {
           <div className="how-to-heading">
             <div>
               <span className="studio-kicker">FROM PHOTOS TO A DOUBLE ACT</span>
-              <h2 id="how-title">How to make your pet dance video</h2>
+              <h2 id="how-title">How to make your dance video</h2>
             </div>
             <a className="text-link" href="#create">
               Try the studio <ArrowDown size={16} />
@@ -75,8 +75,8 @@ export default function Home() {
               <span className="step-number">02</span>
               <h3>Add your two stars</h3>
               <p>
-                Upload one clear photo per pet. Character A appears in the
-                foreground; character B takes the background. Use well-lit
+                Upload one clear photo per person or pet. Character A appears in
+                the foreground; character B takes the background. Use well-lit
                 photos with an unobstructed face.
               </p>
             </li>

@@ -1,6 +1,6 @@
 # Smalltown Boy AI
 
-面向宠物与虚构非人角色的双角色 AI 舞蹈视频生成器，提供英文界面、双图上传、积分套餐、任务追踪与私人视频管理。
+面向已同意参与的成年人和宠物的双角色 AI 舞蹈视频生成器，提供英文界面、双图上传、积分套餐、任务追踪与私人视频管理。
 
 **线上地址：[https://smalltownboyai.one](https://smalltownboyai.one)**
 
@@ -107,7 +107,7 @@ npx wrangler deploy --config dist/server/wrangler.json --dry-run
 npx wrangler deploy --config wrangler.jobs.jsonc --dry-run
 ```
 
-当前验证记录包含 54 项通过的测试，以及类型检查、Vinext 兼容性、生产构建和两个 Worker 的部署预检。`--dry-run` 不执行发布，也不能替代云端验收。使用 `npm run preview` 可在本地预览生产构建。
+当前验证记录包含 86 项通过的测试，以及类型检查、Vinext 兼容性、生产构建和两个 Worker 的部署预检。`--dry-run` 不执行发布，也不能替代云端验收。使用 `npm run preview` 可在本地预览生产构建。
 
 `npm run db:generate` 用于检查 Drizzle 模型差异；自定义触发器位于独立 SQL 迁移中，使用 Wrangler 按顺序应用，不使用 `drizzle-kit push` 绕过迁移。迁移 SQL 与 Drizzle journal 均需保留。
 
@@ -164,3 +164,7 @@ npx wrangler deploy --config wrangler.jobs.jsonc --dry-run
 管理员可在 `/admin` 的 **Grant test credits** 按已注册邮箱赠送积分并授予最高画质，无需付款。赠送有独立记录、积分流水和审计，重复提交不会重复到账，不伪造支付成功订单。先应用 `0006` 迁移；操作步骤与生成开关区别见 [部署说明](docs/deployment.md#管理员测试积分无需支付)。
 
 模板是否启用、各模板使用授权和开放画质现在可在 `/admin` → **Generation settings** 保存，立即影响后续请求。第一次保存后可删除三个旧的 `VERIFIED_TEMPLATES`、`VERIFIED_RESOLUTIONS`、`REFERENCE_LICENSE_CONFIRMED` 环境变量；`GENERATION_ENABLED` 仍为总开关。
+
+### 真人与宠物模式
+
+生成器默认 Human duo，也可选 Pet duo；两种模式分别使用服务端提示词，Waffo 审核同一份实际提示词。真人模式要求双方成年且明确授权。任务和待提交草稿保存模式，同一请求键不能更换模式。先应用 `0007_subject_mode.sql` 再部署；旧任务与旧客户端保留 pet 语义。模式接入完成不代表真人身份替换效果已通过付费实测。

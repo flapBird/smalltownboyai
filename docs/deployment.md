@@ -150,13 +150,11 @@ Google 回调；Waffo sandbox 完整付款、重发、乱序、退款；迁移�
 
 第一次保存前兼容旧 `VERIFIED_TEMPLATES` / `VERIFIED_RESOLUTIONS` / `REFERENCE_LICENSE_CONFIRMED` 作为初始值；从未配置时默认全部关闭。保存后数据库配置优先，这三个 Cloudflare 变量可删除。授权按具体模板版本记录，不会自动确认新模板版本。保留 `GENERATION_ENABLED` 总开关与 `TEMPLATE_PREVIEWS_ENABLED` 首页预览开关。后台配置不会跳过密钥、素材版本、积分或内容检测校验。
 
-
 ## 部署时保留后台变量
 
 Web 和 Jobs 的 Wrangler 配置均使用 `keep_vars: true`，且不声明 `vars`。所有线上运行变量与 Secret 由各 Worker 的 Cloudflare Settings → Variables and Secrets 管理；不要把生成/支付开关、支付环境、商店 ID、输出域名或检测额度重新加入部署配置，以免同名值在 Git 部署时覆盖后台设置。构建后还应确认 `dist/server/wrangler.json` 保留 `keep_vars: true` 且 `vars` 为空。
 
 首次部署须在后台配置 `APP_MODE=production`、`APP_ORIGIN=https://smalltownboyai.one` 和上文所列业务参数。Jobs 也需单独配置来源域名、密钥与 `OUTPUT_HOSTS`；现有后台参数由后续部署保留。本地开发继续使用未提交的 `.dev.vars`（参考 `.dev.vars.example`），不会上传本地密钥。此修复不会自动恢复此前被覆盖的值，恢复开关或支付环境应以实际运营配置为准。
-
 
 ## 输入检测期间刷新恢复
 
@@ -164,9 +162,18 @@ Web 和 Jobs 的 Wrangler 配置均使用 `keep_vars: true`，且不声明 `vars
 
 状态提示区分检测照片、模板和视频；连接重试明确显示服务延迟，不代表内容违规。后台检测仍保留原请求与幂等键、限额、退避、截止时间和失败关闭机制，不绕过审核。
 
-
 ## 输入图片标准化
 
 浏览器在每次新上传前使用图像解码器读取像素，按原比例缩至最长边不超过 1568px，重新编码为 PNG 后上传到私有 R2；限制每边至少 256px、总像素至少 78,400 和上传文件不超过 8MB。无法解码的文件在调用审核前提示重新导出。此处理减少编码兼容问题，不代替服务器内容审核；直接调用上传 API 的客户端仍须通过原有校验和 SeeAPI 检测。
 
 供应商返回 IMAGE_CORRUPT 时，错误响应提供对应已校验的输入素材 ID；页面仅清除该图的已上传 ID，下一次用户重试时重新编码上传，保留另一张素材的 ID。旧版本只保存 PROVIDER_TERMINAL 的失败记录不能反推出错误码，需用户重新选择失败图片。修复不自动更改历史检测结论、计费记录或重发收费请求。
+
+## 真人与宠物模式、任务交付修复（2026-11-09）
+
+发布前应用 `0007_subject_mode.sql`：记录 `video_tasks.subject_mode`，旧记录默认 pet。前端默认 Human duo；真人双人和双宠物分别构造提示词，Waffo 检测实际选用的提示词。真人输入要求双方成年且明确同意。模式与请求键绑定，不允许同一请求改成另一模式重复扣费；旧待提交草稿继续按宠物模式恢复。真人替换质量仍需真实样例验收，不能将参数传入等同于身份替换成功。
+
+Web 和 Jobs 的 `MEDIA_SIGNING_SECRET` **值必须完全一致**，仅变量同名不够；`APP_ORIGIN` 均指向正式站点。站内 `/api/moderation-media/:id` 是无需登录的临时签名媒体通道，校验有效期、检测状态和 R2 ETag，不是公开存储桶。无效签名、过期链接或缺失素材均返回 404。日志与报告不要记录完整签名 URL。
+
+Jobs 的 `OUTPUT_HOSTS` 需包含供应商实际返回的精确域名。本次实际返回 `d2h7xmz5gqybh9.cloudfront.net`。未配置时任务保存为等待取回，明确记录 `OUTPUT_HOSTS_NOT_CONFIGURED`；不重新生成、不额外扣生成积分。原生 Workers fetch 调用已固定接收者，避免 Jobs 查询时报 Illegal invocation。
+
+对供应商明确返回 `MEDIA_URL_INVALID` 的成片检测，允许一次独立重检：保留原检测记录、原请求体和幂等键，用新记录与新签名 URL；仍受检测预算限制。其他不确定失败和违规拦截不采用此重试。第二次失败继续私有保留，不无限创建收费检测。成片必须通过检测后才能交付。

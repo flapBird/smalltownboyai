@@ -137,6 +137,7 @@ export const tasks = sqliteTable(
     status: text("status").notNull(),
     resolution: text("resolution").notNull(),
     credits: integer("credits").notNull(),
+    subjectMode: text("subject_mode").notNull().default("pet"),
     assetA: text("asset_a").notNull(),
     assetB: text("asset_b").notNull(),
     provider: text("provider").notNull(),

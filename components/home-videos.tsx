@@ -19,7 +19,7 @@ export function HomeVideos({ hero = false }: { hero?: boolean }) {
             <Film size={15} /> THE TWO-PHOTO DANCE STUDIO
           </span>
           <h1>
-            Two pets.
+            Two photos.
             <br />
             One iconic
             <br />
@@ -33,7 +33,7 @@ export function HomeVideos({ hero = false }: { hero?: boolean }) {
             Make your duo <ArrowUpRight size={20} />
           </a>
           <div className="hero-facts">
-            <span>2 pet photos</span>
+            <span>People or pets</span>
             <span>14-second dance</span>
             <span>No prompts needed</span>
           </div>

@@ -115,8 +115,8 @@ export function TemplatePicker({
                 />
                 <h3>{preview?.name}</h3>
                 <p>
-                  {preview?.description} Choose a photo for the foreground pet
-                  and another for the background pet.
+                  {preview?.description} Choose a photo for the foreground
+                  performer and another for the background performer.
                 </p>
               </div>
               <div className="template-dialog-options">
@@ -138,7 +138,7 @@ export function TemplatePicker({
                     <span className="template-thumb">{thumbnail(t)}</span>
                     <span>
                       <strong>{t.name}</strong>
-                      <small>{t.duration} seconds · two pets</small>
+                      <small>{t.duration} seconds · two performers</small>
                     </span>
                     {candidate === t.id && <Check size={18} />}
                   </button>

@@ -5,6 +5,7 @@ import {
   Plus,
   Music2,
   PawPrint,
+  Users,
   X,
   Sparkles,
   ArrowUpRight,
@@ -18,6 +19,7 @@ import {
   readPendingGeneration,
   type PendingGeneration,
 } from "@/lib/generation-draft";
+import { readApiResponse } from "@/lib/client-response";
 import { normalizePhoto } from "@/lib/normalize-photo";
 import { TemplatePicker } from "./template-picker";
 import { Button } from "./ui/button";
@@ -43,13 +45,7 @@ async function api(path: string, body?: unknown) {
           body: JSON.stringify(body),
         },
   );
-  const d: any = await r.json();
-  if (!r.ok)
-    throw Object.assign(
-      new Error(d.error || "Something went wrong. Please try again."),
-      { code: d.code, assetId: d.assetId },
-    );
-  return d;
+  return readApiResponse(r);
 }
 const saveDraft = (key: string, file: File) =>
   new Promise<void>((resolve, reject) => {
@@ -97,6 +93,7 @@ async function clearDraft(key: string) {
 }
 export function Generator() {
   const [photos, setPhotos] = useState<(Photo | null)[]>([null, null]);
+  const [subjectMode, setSubjectMode] = useState<"human" | "pet">("human");
   const [templateId, setTemplateId] = useState("living-room");
   const [resolution, setResolution] = useState<Resolution>("480p");
   const [user, setUser] = useState<{
@@ -131,6 +128,7 @@ export function Generator() {
     recovering.current = true;
     setPending(saved);
     setConsent(true);
+    setSubjectMode(saved.payload.subjectMode ?? "pet");
     setResolution(saved.payload.resolution);
     setTemplateId(saved.payload.templateId);
     key.current = saved.payload.requestKey;
@@ -185,8 +183,14 @@ export function Generator() {
     const id = localStorage.getItem("smalltown-task");
     if (id)
       api("tasks/" + id)
-        .then(setTask)
-        .catch(() => localStorage.removeItem("smalltown-task"));
+        .then((t) => {
+          setTask(t);
+          setSubjectMode(t.subject_mode ?? "pet");
+        })
+        .catch((error) => {
+          if (error.status === 404) localStorage.removeItem("smalltown-task");
+          else setMessage(error.message);
+        });
   }, []);
   useEffect(() => {
     if (!task || ["completed", "failed", "unknown"].includes(task.status))
@@ -196,6 +200,7 @@ export function Generator() {
         api("tasks/" + task.id)
           .then((t) => {
             setTask(t);
+            setMessage("");
             if (t.status === "completed" || t.status === "failed")
               api("me").then((u) => {
                 setUser(u);
@@ -237,6 +242,8 @@ export function Generator() {
     }
   }
   async function samples() {
+    setSubjectMode("pet");
+    setConsent(false);
     setBusy("samples");
     try {
       for (const i of [0, 1]) {
@@ -324,6 +331,7 @@ export function Generator() {
       }
       key.current ??= crypto.randomUUID();
       const payload = {
+        subjectMode,
         assetA: ids[0],
         assetB: ids[1],
         resolution,
@@ -452,7 +460,9 @@ export function Generator() {
         <div>
           <span className="studio-kicker">01 / MAKE IT THEIRS</span>
           <h2>Cast your dancing duo.</h2>
-          <p>One photo for each pet. We’ll take care of the moves.</p>
+          <p>
+            One clear photo per person or pet. Choose the matching mode below.
+          </p>
         </div>
         <span className="studio-format">
           14 SEC <span>/</span> 9:16
@@ -599,13 +609,32 @@ export function Generator() {
               ))}
             </div>
           </fieldset>
-          <div className="studio-subject">
-            <span className="studio-kicker">CAST</span>
-            <span>
-              <PawPrint size={17} />
-              Pet duo
-            </span>
-          </div>
+          <fieldset className="studio-quality">
+            <legend className="studio-kicker">SUBJECT MODE</legend>
+            <div className="quality-options subject-options">
+              {(["human", "pet"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={subjectMode === mode}
+                  className={subjectMode === mode ? "selected" : ""}
+                  disabled={!!busy || !!active || !!pending}
+                  onClick={() => {
+                    setSubjectMode(mode);
+                    setConsent(false);
+                    key.current = null;
+                  }}
+                >
+                  {mode === "human" ? (
+                    <Users size={17} />
+                  ) : (
+                    <PawPrint size={17} />
+                  )}
+                  {mode === "human" ? "Human duo" : "Pet duo"}
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <div className="studio-cost">
             <span>This video</span>
             <strong>
@@ -625,9 +654,11 @@ export function Generator() {
               onChange={(e) => setConsent(e.target.checked)}
             />
             <span>
-              I own these photos or have permission to use them. Pets and
-              fictional nonhuman characters only. Live generation uses SeeAPI
-              safety checks; see our <a href="/privacy">Privacy Policy</a>.
+              {subjectMode === "human"
+                ? "I am 18+, both people shown are adults and have agreed to this AI video. I own or have permission to use these photos."
+                : "I own these pet photos or have permission to use them."}{" "}
+              Live generation uses safety checks; see our{" "}
+              <a href="/privacy">Privacy Policy</a>.
             </span>
           </label>
           <Button
@@ -737,7 +768,12 @@ export function Generator() {
                       : task.error_code === "SAFETY_UNAVAILABLE"
                         ? "Safety checks could not finish. Your video remains private; contact support for review."
                         : "Checking your video automatically. It will be ready to download when checks pass."
-                    : "Your task is saved. You can check back in My Videos."}
+                    : task.error_code?.startsWith("OUTPUT_") ||
+                        task.error_code === "INVALID_MP4"
+                      ? "The provider finished, but we could not save its video yet. Your task is saved; no new generation will be started. Support can resolve the download issue."
+                      : task.error_code === "JOBS_CONFIGURATION_MISSING"
+                        ? "This task is waiting for a service configuration fix. Your request is saved; do not submit it again."
+                        : "Your task is saved. You can check back in My Videos."}
             </p>
             <small>
               Task {task.id.slice(0, 8)} · {task.resolution}

@@ -4,6 +4,7 @@ const schema = z.object({
   owner: z.string().min(1),
   startedAt: z.number().finite(),
   payload: z.object({
+    subjectMode: z.enum(["human", "pet"]).optional(),
     assetA: z.string().uuid(),
     assetB: z.string().uuid(),
     resolution: z.enum(["480p", "768p", "1080p"]),

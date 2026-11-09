@@ -79,7 +79,7 @@ export function Login() {
         <img src="/icon.svg" alt="Smalltown Boy AI" width={40} height={40} />
       </a>
       <h1>Sign in</h1>
-      <p className="login-subtitle">Create and save your pet videos.</p>
+      <p className="login-subtitle">Create and save your dance videos.</p>
       <Button
         variant="outline"
         disabled={busy || !cfg?.google}
@@ -805,7 +805,7 @@ export function Admin() {
                   <option value="pause">Pause generation</option>
                   <option value="resume">Resume generation</option>
                   <option value="compensate">Compensate credits</option>
-                  <option value="approve-input">Approve pet image</option>
+                  <option value="approve-input">Approve input image</option>
                   <option value="reject-input">Reject image</option>
                   <option value="approve-output">
                     Approve generated video
