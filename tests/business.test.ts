@@ -1159,6 +1159,63 @@ describe("durable safety gates", () => {
       expect(response.status).toBe(state === "passed" ? 200 : 404);
     }
   });
+  it("constructs actual moderation requests in Workers and rejects redirects without following them", async () => {
+    const { ensureCheck, runCheck } = await import("../lib/moderation");
+    const runtime = new Miniflare(
+      convertV4MiniflareOptions({
+        modules: true,
+        compatibilityDate: "2026-10-01",
+        script: `export default {async fetch(request) {
+        const init = await request.json();
+        const upstream = new Request("https://api.seeapi.com/v1/inferences", init);
+        if (upstream.redirect !== "manual") throw new Error("Must not follow redirects");
+        return Response.json({id:"runtime-check",object:"inference",provider:"seeapi",model:"text-nsfw-filter",endpoint:"text-moderation",status:"processing",result:null,error:null});
+      }}`,
+      }),
+    );
+    try {
+      const env = safetyEnv();
+      const check = await ensureCheck(
+        env,
+        crypto.randomUUID(),
+        "prompt",
+        "runtime",
+        "text",
+        { text: "Two pets dance" },
+      );
+      const transport = vi.fn(async (_url: unknown, init?: RequestInit) => {
+        const { signal, ...serializable } = init!;
+        const r = await runtime.dispatchFetch("http://localhost", {
+          method: "POST",
+          body: JSON.stringify(serializable),
+        });
+        return new Response(await r.text(), {
+          status: r.status,
+          headers: { "Content-Type": "application/json" },
+        });
+      });
+      const result = await runCheck(env, check.id, transport as typeof fetch);
+      expect(result.provider_id).toBe("runtime-check");
+      expect(result.error).toBeNull();
+      await db
+        .prepare("UPDATE moderation_checks SET next_at=0 WHERE id=?")
+        .bind(check.id)
+        .run();
+      const redirect = vi.fn(async (_url: unknown, init?: RequestInit) => {
+        expect(init?.redirect).toBe("manual");
+        return new Response(null, {
+          status: 302,
+          headers: { Location: "https://untrusted.invalid" },
+        });
+      });
+      const rejected = await runCheck(env, check.id, redirect as typeof fetch);
+      expect(rejected.state).toBe("unavailable");
+      expect(rejected.error).toBe("HTTP_302");
+      expect(redirect).toHaveBeenCalledTimes(1);
+    } finally {
+      await runtime.dispose();
+    }
+  });
   it("persists identical body/key after a lost POST, then polls the saved ID", async () => {
     const { ensureCheck, runCheck } = await import("../lib/moderation");
     const owner = crypto.randomUUID(),

@@ -124,3 +124,10 @@ AUP 增加 CSAM/儿童不安全内容及 NCII 专项零容忍条款。实际生�
 线上只读记录显示第一张输入图的检测 pending、3 次尝试、TRANSPORT_RETRY，尚无供应商任务 ID；未证明图片违规。无凭据连通性检查可到达 SeeAPI 主机，但不等同于 Worker 真实检测恢复。新增按账号隔离的待生成请求恢复、原素材/请求键复用、等待时间与连接延迟提示、单次页面有界等待及手动恢复。旧浏览器未保存的请求无法由此补回。
 
 77 项测试、类型检查、生产构建通过；本地模拟接口验证刷新仍复用原请求键且不重复上传，成功提交后保存任务并清理待提交记录。未调用收费审核/生成，未更改线上变量或密钥，未部署。检查确认无 llms.txt，已同步部署说明。
+
+
+## 2026-11-09 检测持续等待的根因修复
+
+在实际 Miniflare/workerd 复现：Workers 不支持 `redirect: "error"`，构造请求即抛 TypeError，原审核代码把它归为 TRANSPORT_RETRY，因此请求没有到达 SeeAPI。成片下载存在同样参数，已一并改为 `manual`；3xx 仍作为失败处理，不跟随 Location，不转发凭据。官方依据：https://developers.cloudflare.com/workers/runtime-apis/request/#constructor 。
+
+新增实际 Workers Request 构造回归测试，并验证 302 只请求一次且不通过检测。78 项测试、类型检查和生产构建通过。未调用收费推理、修改线上密钥或变量。检查确认项目不存在 llms.txt。需部署 Web 和 Jobs 两个 Worker 后才生效；已超时的历史检测仍保持失败关闭，不自动重置或放行。

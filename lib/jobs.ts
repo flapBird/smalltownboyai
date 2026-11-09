@@ -16,7 +16,7 @@ async function saveOutput(e: Bindings, t: TaskRow, url: string) {
   )
     throw new Error("OUTPUT_HOST_NOT_ALLOWED");
   const response = await fetch(url, {
-    redirect: "error",
+    redirect: "manual",
     signal: AbortSignal.timeout(25000),
   });
   if (!response.ok || !response.body) throw new Error("OUTPUT_DOWNLOAD_FAILED");

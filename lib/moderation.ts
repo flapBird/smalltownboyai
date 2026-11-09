@@ -461,7 +461,7 @@ export async function runCheck(
         },
         ...(!provider ? { body: claimed.body } : {}),
         signal: AbortSignal.timeout(15000),
-        redirect: "error",
+        redirect: "manual",
       },
     );
     const retry = r.headers.get("retry-after");
