@@ -22,7 +22,7 @@ import {
 } from "../lib/templates";
 import { WaveSpeed } from "../lib/providers/wavespeed";
 import { handle } from "../lib/api";
-import { reconcile } from "../lib/jobs";
+import { reconcile, recoverStoredOutputs } from "../lib/jobs";
 import { type Bindings } from "../lib/env";
 import { imageInfo, signature, validSignature } from "../lib/media";
 let mf: Miniflare, db: D1Database, e: Bindings;
@@ -1171,14 +1171,13 @@ describe("durable safety gates", () => {
       templateMock.mockRestore();
     }
   });
-  it("automatically delivers passed outputs once, keeping blocked and unavailable outputs private", async () => {
-    const { ensureCheck, reconcileModeration } =
-      await import("../lib/moderation");
+  it("recovers stored legacy outputs once without changing historical safety verdicts", async () => {
+    const { ensureCheck } = await import("../lib/moderation");
     const env = safetyEnv();
-    for (const state of ["passed", "blocked", "unavailable"]) {
+    for (const state of ["passed", "blocked", "unavailable", "pending"]) {
       const u = await user();
       const { task } = await reserveTask(db, u.id, input(u.assets), false);
-      const key = "outputs/" + u.id + "/auto.mp4";
+      const key = "outputs/" + u.id + "/" + task.id + ".mp4";
       const obj = await e.MEDIA.put(
         key,
         readFileSync("public/fixtures/mock.mp4"),
@@ -1197,28 +1196,36 @@ describe("durable safety gates", () => {
         .prepare("UPDATE moderation_checks SET state=? WHERE id=?")
         .bind(state, c.id)
         .run();
-      await reconcileModeration(env);
-      await reconcileModeration(env);
+      await recoverStoredOutputs(env);
+      await recoverStoredOutputs(env);
+      expect(
+        (
+          await db
+            .prepare("SELECT state FROM moderation_checks WHERE id=?")
+            .bind(c.id)
+            .first()
+        )?.state,
+      ).toBe(state);
       const row = await db
         .prepare("SELECT status FROM video_tasks WHERE id=?")
         .bind(task.id)
         .first();
-      expect(row?.status).toBe(state === "passed" ? "completed" : "review");
+      expect(row?.status).toBe("completed");
       const ledger = await db
         .prepare(
           "SELECT COUNT(*) n FROM credit_transactions WHERE business_key=?",
         )
         .bind("settle:" + task.id)
         .first();
-      expect(ledger?.n).toBe(state === "passed" ? 1 : 0);
-      expect((await wallet(u.id))?.reserved).toBe(state === "passed" ? 0 : 100);
+      expect(ledger?.n).toBe(1);
+      expect((await wallet(u.id))?.reserved).toBe(0);
       const response = await handle(
         new Request("http://localhost/api/tasks/" + task.id + "/video", {
           headers: await authenticated(u.id),
         }),
         env,
       );
-      expect(response.status).toBe(state === "passed" ? 200 : 404);
+      expect(response.status).toBe(200);
     }
   });
   it("constructs actual moderation requests in Workers and rejects redirects without following them", async () => {
@@ -1335,10 +1342,16 @@ describe("durable safety gates", () => {
     const { ensureCheck, runCheck } = await import("../lib/moderation");
     const env = safetyEnv(),
       owner = crypto.randomUUID();
+    const key = `templates/quota-${owner}.mp4`;
+    const object = await e.MEDIA.put(
+      key,
+      readFileSync("public/fixtures/mock.mp4"),
+    );
     const results = await Promise.allSettled(
       Array.from({ length: 6 }, (_, i) =>
-        ensureCheck(env, owner, "prompt", String(i), "text", {
-          text: "pet " + i,
+        ensureCheck(env, owner, "template", String(i), "video", {
+          key,
+          etag: object!.etag,
         }),
       ),
     );
@@ -1367,13 +1380,16 @@ describe("durable safety gates", () => {
       "unavailable",
     );
     expect(transport).not.toHaveBeenCalled();
+    await db
+      .prepare("DELETE FROM moderation_checks WHERE owner=?")
+      .bind(owner)
+      .run();
+    await e.MEDIA.delete(key);
   });
-  it("never authorizes replaced output bytes and does not spend for insufficient balance", async () => {
-    const { ensureCheck, approvedOutputEtag, moderateInputs } =
-      await import("../lib/moderation");
+  it("does not spend for insufficient balance before input screening", async () => {
+    const { moderateInputs } = await import("../lib/moderation");
     const env = safetyEnv(),
-      u = await user(0),
-      key = "outputs/" + u.id + "/safe.mp4";
+      u = await user(0);
     await expect(moderateInputs(env, u.id, input(u.assets))).rejects.toThrow(
       "credit balance",
     );
@@ -1382,33 +1398,6 @@ describe("durable safety gates", () => {
       .bind(u.id)
       .first<{ n: number }>();
     expect(count?.n).toBe(0);
-    const bytes = new Uint8Array(36),
-      v = new DataView(bytes.buffer);
-    v.setUint32(0, 36);
-    bytes.set(new TextEncoder().encode("moov"), 4);
-    v.setUint32(8, 28);
-    bytes.set(new TextEncoder().encode("mvhd"), 12);
-    v.setUint32(28, 1000);
-    v.setUint32(32, 14000);
-    const obj = await e.MEDIA.put(key, bytes);
-    const c = await ensureCheck(env, u.id, "output", "job", "video", {
-      key,
-      etag: obj!.etag,
-    });
-    const t = {
-      id: "job",
-      user_id: u.id,
-      output_key: key,
-    } as import("../lib/credits").TaskRow;
-    await expect(approvedOutputEtag(env, t)).rejects.toThrow();
-    await db
-      .prepare("UPDATE moderation_checks SET state='passed' WHERE id=?")
-      .bind(c.id)
-      .run();
-    expect(await approvedOutputEtag(env, t)).toBe(obj!.etag);
-    bytes[35] = 1;
-    await e.MEDIA.put(key, bytes);
-    await expect(approvedOutputEtag(env, t)).rejects.toThrow();
   });
   it("migrates current package prices without changing credits", async () => {
     const rows = await db
@@ -1425,7 +1414,7 @@ describe("durable safety gates", () => {
   });
 });
 
-it("blocks output downloads and administrator approval without safety approval", async () => {
+it("keeps unfinished outputs private and allows authenticated admin delivery without another safety call", async () => {
   const u = await user(),
     headers = await authenticated(u.id);
   const { task } = await reserveTask(db, u.id, input(u.assets), false);
@@ -1460,8 +1449,8 @@ it("blocks output downloads and administrator approval without safety approval",
     }),
     e,
   );
-  expect(approve.status).toBe(503);
-  expect(await wallet(u.id)).toMatchObject({ balance: 500, reserved: 100 });
+  expect(approve.status).toBe(200);
+  expect(await wallet(u.id)).toMatchObject({ balance: 500, reserved: 0 });
   await db
     .prepare("UPDATE video_tasks SET status='completed' WHERE id=?")
     .bind(task.id)
@@ -1475,7 +1464,7 @@ it("blocks output downloads and administrator approval without safety approval",
         e,
       )
     ).status,
-  ).toBe(404);
+  ).toBe(200);
 });
 
 describe("payment webhook fulfillment and refund regression", () => {
@@ -1825,8 +1814,83 @@ it("persists subject mode and rejects changing it under the same credit reservat
   expect(await wallet(u.id)).toMatchObject({ balance: 500, reserved: 100 });
 });
 
-it("retries a definitively rejected output URL once with a distinct durable check", async () => {
-  const { moderateOutput } = await import("../lib/moderation");
+it("archives provider output and settles once without creating or polling output checks", async () => {
+  const env = {
+    ...e,
+    WAVESPEED_API_KEY: "test",
+    OUTPUT_HOSTS: "cdn.example.test",
+  };
+  const u = await user();
+  const { task } = await reserveTask(db, u.id, input(u.assets), false);
+  await db
+    .prepare(
+      "UPDATE video_tasks SET status='processing',provider_task_id='provider-test' WHERE id=?",
+    )
+    .bind(task.id)
+    .run();
+  const query = vi.spyOn(WaveSpeed.prototype, "queryTask").mockResolvedValue({
+    id: "provider-test",
+    status: "completed",
+    url: "https://cdn.example.test/result.mp4",
+  });
+  const transport = vi.fn(
+    async () => new Response(readFileSync("public/fixtures/mock.mp4")),
+  );
+  vi.stubGlobal("fetch", transport);
+  try {
+    await reconcile(env);
+    await reconcile(env);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(transport).toHaveBeenCalledTimes(1);
+    const stranger = await user();
+    for (const headers of [{}, await authenticated(stranger.id)]) {
+      const response = await handle(
+        new Request(`http://localhost/api/tasks/${task.id}/video`, { headers }),
+        env,
+      );
+      expect([401, 404]).toContain(response.status);
+    }
+    const row = await db
+      .prepare(
+        "SELECT status,error_code,output_key FROM video_tasks WHERE id=?",
+      )
+      .bind(task.id)
+      .first();
+    expect(row).toMatchObject({
+      status: "completed",
+      error_code: null,
+      output_key: `outputs/${u.id}/${task.id}.mp4`,
+    });
+    expect(
+      (
+        await db
+          .prepare(
+            "SELECT COUNT(*) n FROM moderation_checks WHERE owner=? AND stage='output'",
+          )
+          .bind(u.id)
+          .first()
+      )?.n,
+    ).toBe(0);
+    expect(await wallet(u.id)).toMatchObject({ balance: 500, reserved: 0 });
+    expect(
+      (
+        await db
+          .prepare(
+            "SELECT COUNT(*) n FROM credit_transactions WHERE business_key=?",
+          )
+          .bind("settle:" + task.id)
+          .first()
+      )?.n,
+    ).toBe(1);
+  } finally {
+    query.mockRestore();
+    vi.unstubAllGlobals();
+  }
+});
+
+it("does not resume retired output checks or deliver missing, deleted or unrelated review outputs", async () => {
+  const { ensureCheck, reconcileModeration } =
+    await import("../lib/moderation");
   const env = {
     ...e,
     APP_ORIGIN: "https://smalltownboyai.one",
@@ -1835,30 +1899,87 @@ it("retries a definitively rejected output URL once with a distinct durable chec
   };
   const u = await user();
   const { task } = await reserveTask(db, u.id, input(u.assets), false);
-  task.output_key = "outputs/" + task.id + ".mp4";
-  await e.MEDIA.put(task.output_key, readFileSync("public/fixtures/mock.mp4"));
-  const original = await moderateOutput(env, task, false);
+  const key = `outputs/${u.id}/${task.id}.mp4`;
+  const obj = await e.MEDIA.put(key, readFileSync("public/fixtures/mock.mp4"));
+  const check = await ensureCheck(env, u.id, "output", task.id, "video", {
+    key,
+    etag: obj!.etag,
+  });
+  const transport = vi.fn();
+  vi.stubGlobal("fetch", transport);
+  try {
+    await reconcileModeration(env);
+    expect(transport).not.toHaveBeenCalled();
+    expect(
+      (
+        await db
+          .prepare("SELECT state FROM moderation_checks WHERE id=?")
+          .bind(check.id)
+          .first()
+      )?.state,
+    ).toBe("pending");
+  } finally {
+    vi.unstubAllGlobals();
+  }
   await db
-    .prepare(
-      "UPDATE moderation_checks SET state='unavailable',error='PROVIDER_MEDIA_URL_INVALID' WHERE id=?",
-    )
-    .bind(original.id)
+    .prepare("UPDATE video_tasks SET status='review',output_key=? WHERE id=?")
+    .bind(key, task.id)
     .run();
-  const retry = await moderateOutput(env, task, false);
-  expect(retry.id).not.toBe(original.id);
-  expect(retry.body).not.toBe(original.body);
-  expect((await moderateOutput(env, task, false)).id).toBe(retry.id);
-  await db
-    .prepare(
-      "UPDATE moderation_checks SET state='unavailable',error='PROVIDER_MEDIA_URL_INVALID' WHERE id=?",
-    )
-    .bind(retry.id)
-    .run();
-  expect((await moderateOutput(env, task, false)).id).toBe(retry.id);
-  const old = await db
-    .prepare("SELECT body,state FROM moderation_checks WHERE id=?")
-    .bind(original.id)
-    .first();
-  expect(old).toEqual({ body: original.body, state: "unavailable" });
+  await e.MEDIA.delete(key);
+  await recoverStoredOutputs(env);
+  expect(
+    (
+      await db
+        .prepare("SELECT status FROM video_tasks WHERE id=?")
+        .bind(task.id)
+        .first()
+    )?.status,
+  ).toBe("review");
+  await e.MEDIA.put(key, readFileSync("public/fixtures/mock.mp4"));
+  for (const [deleted, error] of [
+    [1, null],
+    [null, "ADMIN_HOLD"],
+  ]) {
+    await db
+      .prepare("UPDATE video_tasks SET deleted_at=?,error_code=? WHERE id=?")
+      .bind(deleted, error, task.id)
+      .run();
+    await recoverStoredOutputs(env);
+    expect(
+      (
+        await db
+          .prepare("SELECT status FROM video_tasks WHERE id=?")
+          .bind(task.id)
+          .first()
+      )?.status,
+    ).toBe("review");
+  }
   expect(await wallet(u.id)).toMatchObject({ balance: 500, reserved: 100 });
+});
+
+it("retired output checks do not occupy input screening concurrency slots", async () => {
+  const { ensureCheck } = await import("../lib/moderation");
+  const env = {
+    ...e,
+    APP_ORIGIN: "https://smalltownboyai.one",
+    SEEAPI_API_KEY: "test",
+    MEDIA_SIGNING_SECRET: "test",
+  };
+  const u = await user();
+  const key = `templates/test-${u.id}.mp4`;
+  const obj = await e.MEDIA.put(key, readFileSync("public/fixtures/mock.mp4"));
+  for (let i = 0; i < 4; i++)
+    await ensureCheck(env, u.id, "output", String(i), "video", {
+      key,
+      etag: obj!.etag,
+    });
+  const inputCheck = await ensureCheck(
+    env,
+    u.id,
+    "template",
+    "template",
+    "video",
+    { key, etag: obj!.etag },
+  );
+  expect(inputCheck.state).toBe("pending");
 });

@@ -6,7 +6,6 @@ import { imageInfo, signature, validSignature } from "./media";
 import { generationPrompt, type SubjectMode } from "./providers/wavespeed";
 import { SPECS, type Resolution } from "./catalog";
 import { getTemplate } from "./templates";
-import { settleTask, type TaskRow } from "./credits";
 
 export const POLICY = "seeapi-strict-v1";
 export const TEXT_CATEGORIES = [
@@ -371,7 +370,7 @@ export async function ensureCheck(
     `INSERT OR IGNORE INTO moderation_checks (id,owner,stage,asset_key,asset_etag,policy,model,endpoint,body,deadline,created_at)
     SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM moderation_checks WHERE created_at>=?)<?
     AND (SELECT COUNT(*) FROM moderation_checks WHERE owner=? AND created_at>=?)<30
-    AND (SELECT COUNT(*) FROM moderation_checks WHERE owner=? AND state='pending')<4`,
+    AND (SELECT COUNT(*) FROM moderation_checks WHERE owner=? AND stage IN ('input','template') AND state='pending')<4`,
   )
     .bind(
       id,
@@ -641,82 +640,12 @@ export async function moderateInputs(
     [string, string]
   >;
 }
-export async function moderateOutput(e: Bindings, t: TaskRow, poll = true) {
-  if (!t.output_key) throw new AppError(404, "Output missing.");
-  const head = await e.MEDIA.head(t.output_key);
-  if (!head) throw new AppError(404, "Output missing.");
-  let c = await ensureCheck(e, t.user_id, "output", t.id, "video", {
-    key: t.output_key,
-    etag: head.etag,
-  });
-  // A definitive URL rejection may be retried once with a fresh signed URL.
-  // Preserve the original provider request and key; never reset an ambiguous check.
-  if (c.state === "unavailable" && c.error === "PROVIDER_MEDIA_URL_INVALID")
-    c = await ensureCheck(
-      e,
-      t.user_id,
-      "output",
-      t.id + ":media-url-retry",
-      "video",
-      {
-        key: t.output_key,
-        etag: head.etag,
-      },
-    );
-  return poll ? requirePass(e, c) : c;
-}
-export async function approvedOutputEtag(e: Bindings, t: TaskRow) {
-  if (!t.output_key) throw new AppError(404, "Output missing.");
-  const head = await e.MEDIA.head(t.output_key);
-  if (!head) throw new AppError(404, "Output missing.");
-  const c = await e.DB.prepare(
-    "SELECT * FROM moderation_checks WHERE owner=? AND stage='output' AND asset_key=? AND asset_etag=? AND policy=? AND state='passed'",
-  )
-    .bind(t.user_id, t.output_key, head.etag, POLICY)
-    .first<Check>();
-  if (!c) throw new AppError(404, "Video is awaiting safety checks.");
-  return head.etag;
-}
+// Output checks are historical records only. Input and template checks still resume.
 export async function reconcileModeration(e: Bindings) {
   const rows = await e.DB.prepare(
-    "SELECT id FROM moderation_checks WHERE stage<>'prompt' AND state='pending' AND next_at<=? AND lease_until<? ORDER BY created_at LIMIT 10",
+    "SELECT id FROM moderation_checks WHERE stage IN ('input','template') AND state='pending' AND next_at<=? AND lease_until<? ORDER BY created_at LIMIT 10",
   )
     .bind(Date.now(), Date.now())
     .all<{ id: string }>();
   for (const r of rows.results) await runCheck(e, r.id);
-  await e.DB.prepare(
-    `UPDATE video_tasks SET error_code=(
-    SELECT CASE c.state WHEN 'blocked' THEN 'SAFETY_BLOCKED' WHEN 'unavailable' THEN 'SAFETY_UNAVAILABLE' WHEN 'pending' THEN 'SAFETY_PENDING' ELSE NULL END
-    FROM moderation_checks c WHERE c.owner=video_tasks.user_id AND c.asset_key=video_tasks.output_key AND c.stage='output' AND c.policy=? ORDER BY c.created_at DESC LIMIT 1
-  ) WHERE provider='wavespeed' AND status='review'`,
-  )
-    .bind(POLICY)
-    .run();
-  if (!e.SEEAPI_API_KEY || !e.MEDIA_SIGNING_SECRET) return;
-  const outputs = await e.DB.prepare(
-    "SELECT * FROM video_tasks WHERE provider='wavespeed' AND status='review' AND output_key IS NOT NULL AND (NOT EXISTS (SELECT 1 FROM moderation_checks c WHERE c.asset_key=video_tasks.output_key AND c.policy=? ) OR EXISTS (SELECT 1 FROM moderation_checks c WHERE c.asset_key=video_tasks.output_key AND c.stage='output' AND c.state='unavailable' AND c.error='PROVIDER_MEDIA_URL_INVALID' AND c.policy=? AND NOT EXISTS (SELECT 1 FROM moderation_checks other WHERE other.asset_key=c.asset_key AND other.stage='output' AND other.policy=c.policy AND other.id<>c.id))) ORDER BY updated_at LIMIT 10",
-  )
-    .bind(POLICY, POLICY)
-    .all<TaskRow>();
-  for (const t of outputs.results) {
-    try {
-      const c = await moderateOutput(e, t, false);
-      await runCheck(e, c.id);
-    } catch {
-      /* Keep private for administrator review. No refund or regeneration on moderation errors. */
-    }
-  }
-  const passed = await e.DB.prepare(
-    "SELECT * FROM video_tasks WHERE provider='wavespeed' AND status='review' AND EXISTS (SELECT 1 FROM moderation_checks c WHERE c.owner=video_tasks.user_id AND c.stage='output' AND c.asset_key=video_tasks.output_key AND c.policy=? AND c.state='passed') ORDER BY updated_at LIMIT 10",
-  )
-    .bind(POLICY)
-    .all<TaskRow>();
-  for (const t of passed.results) {
-    try {
-      await approvedOutputEtag(e, t);
-      await settleTask(e.DB, t.id, true, t.output_key, null, "review");
-    } catch {
-      // Changed or missing bytes stay private; a cached pass cannot release them.
-    }
-  }
 }

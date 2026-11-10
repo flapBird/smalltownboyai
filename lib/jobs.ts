@@ -44,11 +44,21 @@ async function saveOutput(e: Bindings, t: TaskRow, url: string) {
     throw new Error("INVALID_MP4");
   const key = "outputs/" + t.user_id + "/" + t.id + ".mp4";
   await e.MEDIA.put(key, bytes, { httpMetadata: { contentType: "video/mp4" } });
-  await e.DB.prepare(
-    "UPDATE video_tasks SET status='review',output_key=?,updated_at=?,error_code=NULL WHERE id=? AND status='processing'",
-  )
-    .bind(key, Date.now(), t.id)
-    .run();
+  await settleTask(e.DB, t.id, true, key, null, "processing");
+}
+// Complete stored outputs held by the retired output-check gate. Keep the
+// original moderation records intact; delivery is not a new safety verdict.
+export async function recoverStoredOutputs(e: Bindings) {
+  const rows = await e.DB.prepare(
+    "SELECT * FROM video_tasks WHERE provider='wavespeed' AND status='review' AND output_key IS NOT NULL AND deleted_at IS NULL AND (error_code IS NULL OR error_code IN ('SAFETY_PENDING','SAFETY_UNAVAILABLE','SAFETY_BLOCKED')) ORDER BY updated_at LIMIT 15",
+  ).all<TaskRow>();
+  for (const t of rows.results) {
+    const expectedKey = "outputs/" + t.user_id + "/" + t.id + ".mp4";
+    if (t.output_key !== expectedKey) continue;
+    const object = await e.MEDIA.head(expectedKey);
+    if (!object || object.size < 12) continue;
+    await settleTask(e.DB, t.id, true, expectedKey, null, "review");
+  }
 }
 export async function reconcile(e: Bindings) {
   const rows = await e.DB.prepare(
@@ -102,6 +112,7 @@ export async function reconcile(e: Bindings) {
         .run();
     }
   }
+  await recoverStoredOutputs(e);
   await reconcileModeration(e);
   const abandoned = await e.DB.prepare(
     "SELECT id FROM video_tasks WHERE status='queued' AND updated_at<?",

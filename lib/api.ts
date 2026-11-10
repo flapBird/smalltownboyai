@@ -5,12 +5,7 @@ import {
 } from "./generation-settings";
 import { allowedAdmin, unlockAdmin, requireAdminSession } from "./admin-access";
 import { grantCredits } from "./admin-credits";
-import {
-  moderateInputs,
-  moderateOutput,
-  approvedOutputEtag,
-  resolveModerationMedia,
-} from "./moderation";
+import { moderateInputs, resolveModerationMedia } from "./moderation";
 import { z } from "zod";
 import { auth, identity, requireUser, sameOrigin, AppError } from "./auth";
 import {
@@ -563,9 +558,6 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
           t.output_key,
           url.searchParams.get("download") === "1",
           r.headers.get("range"),
-          t.provider === "wavespeed"
-            ? await approvedOutputEtag(e, t)
-            : undefined,
         );
       }
       if (r.method === "GET" && parts.length === 2) {
@@ -744,8 +736,11 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
             throw new AppError(409, "Task is not awaiting review.");
           if (b.action === "approve-output" && !t.output_key)
             throw new AppError(409, "Missing output.");
-          if (b.action === "approve-output" && t.provider === "wavespeed")
-            await moderateOutput(e, t);
+          if (
+            b.action === "approve-output" &&
+            !(await e.MEDIA.head(t.output_key!))
+          )
+            throw new AppError(409, "Missing output.");
           await e.DB.prepare(
             "INSERT OR IGNORE INTO admin_audit_logs VALUES (?,?,?,?,?,?)",
           )

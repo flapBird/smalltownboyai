@@ -1,4 +1,4 @@
-export const LEGAL_UPDATED_AT = "2026-11-08";
+export const LEGAL_UPDATED_AT = "2026-11-10";
 
 export const LEGAL: Record<
   string,
@@ -19,7 +19,7 @@ export const LEGAL: Record<
       ],
       [
         "Safety checks",
-        "For live generation, Waffo screens the generation prompt before generation. SeeAPI receives both reference photos, the template video and the generated video for automated content checks. Video checks sample visual frames; they do not check audio or every frame and cannot guarantee safety. Results remain private until automated checks pass. SeeAPI states that stored files, task information and moderation results have no scheduled automatic expiry; request logs are retained for 60 days. Expiring our links does not delete provider copies. Contact support@smalltownboyai.one for a deletion request, including the relevant task ID. Local demo mode does not submit media to SeeAPI.",
+        "For live generation, Waffo screens the generation prompt before generation. SeeAPI receives both reference photos and the template video for automated checks before generation. Template video checks sample visual frames; they do not check audio or every frame and cannot guarantee safety. We do not submit generated videos to SeeAPI for output screening. Once generation completes and the file is stored, results are available privately to the account owner. SeeAPI states that stored files, task information and moderation results have no scheduled automatic expiry; request logs are retained for 60 days. Expiring our links does not delete provider copies. Contact support@smalltownboyai.one for a deletion request, including the relevant task ID. Local demo mode does not submit media to SeeAPI.",
       ],
       [
         "Storage and deletion",
@@ -140,7 +140,7 @@ export const LEGAL: Record<
       ],
       [
         "Review and enforcement",
-        "Live input images and template videos must pass automated checks before generation. Generated output remains private until automated checks pass, then is released automatically. Manual review is reserved for flagged content, unresolved checks, reports and appeals. For violations, we may warn you, reject or cancel requests, withhold or delete violating content, temporarily restrict credit use, suspend service access, or terminate the account according to the Terms of Service. An investigation hold does not automatically deduct credits; remaining purchased credits and refund requests are handled under the Terms of Service and Refund Policy. You may appeal to support@smalltownboyai.one. Automated checks can be wrong, and unavailable checks do not by themselves establish a violation. The local preview bypasses content review only for isolated test workflows, and must never be deployed as a public service.",
+        "Live input images and template videos must pass automated checks before generation. Generated videos are delivered privately to their account owner after generation and storage, without a separate automated output screening step. Input checks cannot guarantee that generated content complies with this policy. We investigate reports, suspected violations and appeals, and may restrict or remove results. For violations, we may warn you, reject or cancel requests, withhold or delete violating content, temporarily restrict credit use, suspend service access, or terminate the account according to the Terms of Service. An investigation hold does not automatically deduct credits; remaining purchased credits and refund requests are handled under the Terms of Service and Refund Policy. You may appeal to support@smalltownboyai.one. Automated checks can be wrong, and unavailable checks do not by themselves establish a violation. The local preview bypasses content review only for isolated test workflows, and must never be deployed as a public service.",
       ],
       [
         "Report content",

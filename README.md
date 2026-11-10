@@ -20,7 +20,7 @@
 - **任务与视频**：任务状态轮询、视频预览与下载、历史列表和删除；私有 R2 存储、所有权检查及短期签名访问。
 - **账户与积分**：Better Auth Google 登录适配、会话与角色管理；导航账户入口显示头像或姓名首字母、用户名和积分，下拉菜单提供账户、视频、账单、购买积分与退出；新账户初始为 0 积分，积分冻结、消费与释放通过 D1 原子事务和不可变账本处理。
 - **套餐与支付**：Lite $8.90 / 100 积分、Standard $19.90 / 300 积分、Pro $39.90 / 600 积分；480p / 768p / 1080p 每次分别消耗 100 / 200 / 400 积分。集成 Waffo SDK checkout、RSA 验签、支付幂等及全额退款对账，真实可用规格以验证配置为准。
-- **模型与后台任务**：WaveSpeed provider adapter、持久化任务、定时查询、租约与结果归档；输入和输出自动检测，通过后自动生成与交付，不自动重试结果不确定的付费提交。
+- **模型与后台任务**：WaveSpeed provider adapter、持久化任务、定时查询、租约与结果归档；生成前自动检测，生成结果归档后私有交付，不自动重试结果不确定的付费提交。
 - **管理后台**：用户、订单、账本、任务、成本、审核、补偿、暂停与人工退款/拒付对账，保留操作审计。
 - **页面与 SEO**：响应式深色界面、FAQ、政策与联系页面；App Router SSR、Metadata、canonical、Open Graph、robots 与 sitemap，账户页面设置 noindex。
 - **品牌图标**：青柠绿与炭黑的猫咪播放键图标，统一用于导航与页脚；`public/icon.svg` 为矢量源文件，配套 512px PNG、16/32/48px favicon 和 180px Apple 触屏图标。
@@ -159,7 +159,7 @@ npx wrangler deploy --config wrangler.jobs.jsonc --dry-run
 
 ### 内容检测
 
-真实生成采用 Waffo 提示词审核，以及 SeeAPI 双图、模板视频和成片检测，仅异常和申诉进入人工处理；未通过的成片不开放下载。检测记录与重试持久化，批准绑定 R2 ETag。需要在网页和 jobs Worker 同时配置 `SEEAPI_API_KEY`、`MEDIA_SIGNING_SECRET` 与正确 `APP_ORIGIN`，应用新 D1 迁移并验证 cron。具体限额、处理范围和激活步骤见 [部署说明](docs/deployment.md#seeapi-内容检测与新价格2026-11-08)。本地 Mock 不产生检测费用。
+真实生成采用 Waffo 提示词审核，以及 SeeAPI 双图和模板视频检测；生成后不再单独检测成片，结果取回并归档后仅账号本人可预览/下载。输入检测记录与重试持久化，批准绑定 R2 ETag。需要在网页和 jobs Worker 同时配置 `SEEAPI_API_KEY`、`MEDIA_SIGNING_SECRET` 与正确 `APP_ORIGIN`，应用新 D1 迁移并验证 cron。具体限额、处理范围和激活步骤见 [部署说明](docs/deployment.md#seeapi-内容检测与新价格2026-11-08)。本地 Mock 不产生检测费用。
 
 管理员可在 `/admin` 的 **Grant test credits** 按已注册邮箱赠送积分并授予最高画质，无需付款。赠送有独立记录、积分流水和审计，重复提交不会重复到账，不伪造支付成功订单。先应用 `0006` 迁移；操作步骤与生成开关区别见 [部署说明](docs/deployment.md#管理员测试积分无需支付)。
 
