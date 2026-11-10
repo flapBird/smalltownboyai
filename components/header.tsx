@@ -6,7 +6,7 @@ import {
   X,
   ArrowUpRight,
   Coins,
-  ChevronDown,
+  Plus,
   UserRound,
   Clapperboard,
   Receipt,
@@ -73,6 +73,10 @@ export function Header() {
       window.removeEventListener("focus", refresh);
     };
   }, []);
+  const balance = user?.wallet.balance.toLocaleString();
+  const closeAccount = () => {
+    if (account.current) account.current.open = false;
+  };
   return (
     <header className="site-header">
       <div className="nav-wrap">
@@ -83,7 +87,7 @@ export function Header() {
             ["Create", "/#create"],
             ["Pricing", "/pricing"],
             ["How it works", "/#how-to"],
-            ["My Videos", "/dashboard/videos"],
+            ...(user ? [] : [["My Videos", "/dashboard/videos"]]),
           ].map(([name, path]) => (
             <Link key={name} href={path} onClick={() => setOpen(false)}>
               {name}
@@ -92,79 +96,90 @@ export function Header() {
         </nav>
         <div className="nav-end">
           {user ? (
-            <details className="account-menu" ref={account}>
-              <summary aria-label="Open account menu">
-                <span className="account-avatar">
-                  {user.image && !avatarFailed ? (
-                    <img
-                      src={user.image}
-                      alt=""
-                      referrerPolicy="no-referrer"
-                      onError={() => setAvatarFailed(true)}
-                    />
-                  ) : (
-                    (user.name.trim()[0] || "U").toUpperCase()
-                  )}
-                </span>
-                <span className="account-summary">
-                  <strong>{user.name || "My account"}</strong>
-                  <small>
-                    <Coins size={12} />
-                    {user.wallet.balance.toLocaleString()} credits
-                  </small>
-                </span>
-                <ChevronDown className="account-chevron" size={15} />
-              </summary>
-              <div className="account-dropdown">
-                <div className="account-identity">
-                  <strong>{user.name || "My account"}</strong>
-                  {user.email && <span>{user.email}</span>}
-                </div>
-                <div className="account-credit-row">
-                  <span>
-                    <Coins size={16} /> {user.wallet.balance.toLocaleString()}{" "}
-                    credits
+            <div className="account-tools">
+              <Link
+                href="/pricing"
+                className="account-wallet"
+                aria-label={`${balance} credits available. Buy credits`}
+                title="Buy credits"
+                onClick={() => setOpen(false)}
+              >
+                <Coins size={15} aria-hidden="true" />
+                <span className="account-wallet-amount">{balance}</span>
+                <span className="account-wallet-label">credits</span>
+                <Plus
+                  className="account-wallet-add"
+                  size={14}
+                  aria-hidden="true"
+                />
+              </Link>
+              <Link
+                href="/dashboard/videos"
+                className="account-videos-link"
+                aria-label="My Videos"
+                onClick={() => setOpen(false)}
+              >
+                <Clapperboard size={16} aria-hidden="true" />
+                <span>My Videos</span>
+              </Link>
+              <details className="account-menu" ref={account}>
+                <summary
+                  aria-label="Open account menu"
+                  onClick={() => setOpen(false)}
+                >
+                  <span className="account-avatar">
+                    {user.image && !avatarFailed ? (
+                      <img
+                        src={user.image}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        onError={() => setAvatarFailed(true)}
+                      />
+                    ) : (
+                      (user.name.trim()[0] || "U").toUpperCase()
+                    )}
                   </span>
-                  <Link
-                    href="/pricing"
-                    onClick={() => {
-                      if (account.current) account.current.open = false;
-                    }}
+                </summary>
+                <div className="account-dropdown">
+                  <div className="account-identity">
+                    <strong>{user.name || "My account"}</strong>
+                    {user.email && <span>{user.email}</span>}
+                  </div>
+                  <nav aria-label="Account navigation">
+                    <Link href="/dashboard/videos" onClick={closeAccount}>
+                      <Clapperboard size={16} /> My Videos
+                    </Link>
+                    <Link
+                      href="/pricing"
+                      className="account-buy-link"
+                      onClick={closeAccount}
+                    >
+                      <Coins size={16} /> Buy credits{" "}
+                      <ArrowUpRight className="account-buy-arrow" size={14} />
+                    </Link>
+                    <Link href="/dashboard" onClick={closeAccount}>
+                      <UserRound size={16} /> Account overview
+                    </Link>
+                    <Link href="/dashboard/billing" onClick={closeAccount}>
+                      <Receipt size={16} /> Billing
+                    </Link>
+                  </nav>
+                  <button
+                    className="account-signout"
+                    onClick={signOut}
+                    disabled={signingOut}
                   >
-                    Get credits ↗
-                  </Link>
+                    <LogOut size={16} />
+                    {signingOut ? "Signing out…" : "Sign out"}
+                  </button>
+                  {accountError && (
+                    <p role="alert" className="account-error">
+                      {accountError}
+                    </p>
+                  )}
                 </div>
-                <nav
-                  aria-label="Account navigation"
-                  onClick={() => {
-                    if (account.current) account.current.open = false;
-                  }}
-                >
-                  <Link href="/dashboard">
-                    <UserRound size={17} /> Account overview
-                  </Link>
-                  <Link href="/dashboard/videos">
-                    <Clapperboard size={17} /> My videos
-                  </Link>
-                  <Link href="/dashboard/billing">
-                    <Receipt size={17} /> Billing
-                  </Link>
-                </nav>
-                <button
-                  className="account-signout"
-                  onClick={signOut}
-                  disabled={signingOut}
-                >
-                  <LogOut size={17} />
-                  {signingOut ? "Signing out…" : "Sign out"}
-                </button>
-                {accountError && (
-                  <p role="alert" className="account-error">
-                    {accountError}
-                  </p>
-                )}
-              </div>
-            </details>
+              </details>
+            </div>
           ) : (
             <Link className="login-link" href="/login">
               <UserRound size={16} /> Sign in <ArrowUpRight size={15} />

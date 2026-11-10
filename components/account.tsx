@@ -11,6 +11,9 @@ import {
   LogOut,
   Loader2,
   ShieldCheck,
+  Film,
+  Play,
+  AlertCircle,
 } from "lucide-react";
 async function request(path: string, method = "GET", body?: unknown) {
   const r = await fetch("/api/" + path, {
@@ -230,6 +233,72 @@ type Video = {
   created_at: number;
   error_code: string | null;
 };
+function VideoResult({ src, label }: { src: string; label: string }) {
+  const preview = useRef<HTMLDivElement>(null);
+  const player = useRef<HTMLVideoElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const element = preview.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "160px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div className="task-media" ref={preview}>
+      {visible && !failed ? (
+        <>
+          <video
+            ref={player}
+            controls={started}
+            playsInline
+            preload="metadata"
+            aria-label={label}
+            src={src + "#t=0.1"}
+            onError={() => {
+              setFailed(true);
+              setStarted(false);
+            }}
+          />
+          {!started && (
+            <button
+              type="button"
+              className="task-play"
+              aria-label={`Play ${label}`}
+              onClick={() => {
+                setStarted(true);
+                player.current?.play().catch(() => setStarted(false));
+              }}
+            >
+              <Play size={17} aria-hidden="true" />
+            </button>
+          )}
+        </>
+      ) : failed ? (
+        <div className="task-media-message">
+          <AlertCircle size={18} aria-hidden="true" />
+          <span>Preview unavailable</span>
+          <button type="button" onClick={() => setFailed(false)}>
+            Try again
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function Dashboard({ section = "overview" }: { section?: string }) {
   const [user, setUser] = useState<User | null>(null);
   const [videos, setVideos] = useState<Video[]>([]);
@@ -293,10 +362,14 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
                 ? "My videos"
                 : `Hello, ${user.name}.`}
           </h1>
-          <p>Everything you need for your next double act.</p>
+          <p>
+            {section === "videos"
+              ? "Watch and download your dance videos."
+              : "Everything you need for your next double act."}
+          </p>
         </div>
         <button
-          className="button button-outline button-small"
+          className="button button-outline button-small dashboard-signout"
           onClick={async () => {
             await request("logout", "POST");
             location.href = "/";
@@ -318,27 +391,31 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
         ))}
         {user.role === "admin" && <Link href="/admin">Admin</Link>}
       </nav>
-      <div className="wallet-stats">
-        <div className="stat">
-          <span>Available credits</span>
-          <strong>{user.wallet.balance}</strong>
+      {section !== "videos" && (
+        <div className="wallet-stats">
+          <div className="stat">
+            <span>Available credits</span>
+            <strong>{user.wallet.balance}</strong>
+          </div>
+          <div className="stat">
+            <span>Reserved credits</span>
+            <strong>{user.wallet.reserved}</strong>
+          </div>
+          <div className="stat">
+            <span>Resolution access</span>
+            <strong>{TIER_NAMES[user.wallet.tier]}</strong>
+          </div>
         </div>
-        <div className="stat">
-          <span>Reserved credits</span>
-          <strong>{user.wallet.reserved}</strong>
-        </div>
-        <div className="stat">
-          <span>Resolution access</span>
-          <strong>{TIER_NAMES[user.wallet.tier]}</strong>
-        </div>
-      </div>
-      <div style={{ display: "flex", gap: 12, marginBottom: 30 }}>
-        <Link className="button button-primary" href="/#create">
+      )}
+      <div className="dashboard-actions">
+        <Link className="button button-primary button-small" href="/#create">
           Create a video <ArrowUpRight size={16} />
         </Link>
-        <Link className="button button-outline" href="/pricing">
-          Buy credits
-        </Link>
+        {section !== "videos" && (
+          <Link className="button button-outline button-small" href="/pricing">
+            Buy credits
+          </Link>
+        )}
       </div>
       {error && (
         <p role="alert" className="error">
@@ -366,70 +443,85 @@ export function Dashboard({ section = "overview" }: { section?: string }) {
           />
         </>
       ) : videos.length ? (
-        <div className="task-grid">
-          {videos.map((v) => (
-            <article className="task-card" key={v.id}>
-              {v.status === "completed" ? (
-                <video
-                  controls
-                  preload="none"
-                  poster="/images/dance-preview.png"
-                  src={"/api/tasks/" + v.id + "/video"}
-                />
-              ) : (
-                <img
-                  src="/images/dance-preview.png"
-                  alt="Illustrative preview, not the task result"
-                />
-              )}
-              <h3>
-                {v.status === "completed"
-                  ? "Ready for its close-up"
-                  : v.status === "review"
-                    ? v.error_code === "SAFETY_BLOCKED"
-                      ? "Flagged by safety checks"
-                      : v.error_code === "SAFETY_UNAVAILABLE"
-                        ? "Safety check needs attention"
-                        : "Checking video safety"
-                    : v.status.replaceAll("_", " ")}
-              </h3>
-              <p>
-                {v.template_id
-                  ? `${v.template_id === "living-room" ? "Living room" : v.template_id === "red-fence" ? "Red fence" : v.template_id} · `
-                  : ""}
-                {v.resolution}{" "}
-                {v.provider === "mock"
-                  ? "requested · test clip is 480 × 854, 3s"
-                  : ""}
-                <br />
-                {new Date(v.created_at).toLocaleString()}
-              </p>
-              <p>
-                Task {v.id.slice(0, 8)}
-                {v.error_code ? " · " + v.error_code : ""}
-              </p>
-              <div className="task-actions">
-                {v.status === "completed" && (
-                  <a
-                    className="button button-outline button-small"
-                    href={"/api/tasks/" + v.id + "/video?download=1"}
-                  >
-                    <Download size={14} />
-                    Download
-                  </a>
+        <div className="library-grid">
+          {videos.map((video) => {
+            const ready = video.status === "completed";
+            const title =
+              video.template_id === "living-room"
+                ? "Living room"
+                : video.template_id === "red-fence"
+                  ? "Red fence"
+                  : "Dance video";
+            const status =
+              video.status === "review"
+                ? video.error_code === "SAFETY_BLOCKED"
+                  ? "Flagged by safety checks"
+                  : video.error_code === "SAFETY_UNAVAILABLE"
+                    ? "Safety check needs attention"
+                    : "In review"
+                : video.status === "unknown"
+                  ? "Needs attention"
+                  : video.status.replaceAll("_", " ");
+            const date = new Date(video.created_at);
+            const src = `/api/tasks/${video.id}/video`;
+
+            return (
+              <article className="library-card" key={video.id}>
+                {ready ? (
+                  <VideoResult
+                    src={src}
+                    label={`${title} video, ${video.resolution}`}
+                  />
+                ) : (
+                  <div className="task-state" data-status={video.status}>
+                    <Film size={16} aria-hidden="true" />
+                    <span>{status}</span>
+                  </div>
                 )}
-                {["completed", "failed"].includes(v.status) && (
-                  <button
-                    className="button button-ghost button-small"
-                    aria-label="Delete video"
-                    onClick={() => remove(v.id)}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                )}
-              </div>
-            </article>
-          ))}
+                <div className="task-caption">
+                  <h3>{title}</h3>
+                  <p>
+                    {video.resolution}
+                    {video.provider === "mock" ? " requested · test clip" : ""}
+                    {" · "}
+                    <time
+                      dateTime={date.toISOString()}
+                      title={date.toLocaleString()}
+                    >
+                      {date.toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </time>
+                  </p>
+                  {!ready && (
+                    <p className="task-reference">
+                      Task {video.id.slice(0, 8)}
+                      {video.error_code ? " · " + video.error_code : ""}
+                    </p>
+                  )}
+                  {(ready || video.status === "failed") && (
+                    <div className="task-actions">
+                      {ready && (
+                        <a className="task-download" href={src + "?download=1"}>
+                          <Download size={14} /> Download
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        className="task-delete"
+                        aria-label="Delete video"
+                        onClick={() => remove(video.id)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </article>
+            );
+          })}
         </div>
       ) : (
         <div className="empty-state">
