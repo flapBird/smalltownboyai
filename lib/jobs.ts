@@ -1,6 +1,7 @@
 import { reconcileModeration } from "./moderation";
 import type { Bindings } from "./env";
 import { settleTask, type TaskRow } from "./credits";
+import { recoverStoredOutput } from "./output-recovery";
 import { WaveSpeed } from "./providers/wavespeed";
 async function saveOutput(e: Bindings, t: TaskRow, url: string) {
   const u = new URL(url);
@@ -46,19 +47,11 @@ async function saveOutput(e: Bindings, t: TaskRow, url: string) {
   await e.MEDIA.put(key, bytes, { httpMetadata: { contentType: "video/mp4" } });
   await settleTask(e.DB, t.id, true, key, null, "processing");
 }
-// Complete stored outputs held by the retired output-check gate. Keep the
-// original moderation records intact; delivery is not a new safety verdict.
 export async function recoverStoredOutputs(e: Bindings) {
   const rows = await e.DB.prepare(
     "SELECT * FROM video_tasks WHERE provider='wavespeed' AND status='review' AND output_key IS NOT NULL AND deleted_at IS NULL AND (error_code IS NULL OR error_code IN ('SAFETY_PENDING','SAFETY_UNAVAILABLE','SAFETY_BLOCKED')) ORDER BY updated_at LIMIT 15",
   ).all<TaskRow>();
-  for (const t of rows.results) {
-    const expectedKey = "outputs/" + t.user_id + "/" + t.id + ".mp4";
-    if (t.output_key !== expectedKey) continue;
-    const object = await e.MEDIA.head(expectedKey);
-    if (!object || object.size < 12) continue;
-    await settleTask(e.DB, t.id, true, expectedKey, null, "review");
-  }
+  for (const t of rows.results) await recoverStoredOutput(e, t);
 }
 export async function reconcile(e: Bindings) {
   const rows = await e.DB.prepare(

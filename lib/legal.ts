@@ -82,7 +82,7 @@ export const LEGAL: Record<
       ],
       [
         "AI and music",
-        "Concept images are AI-generated. The model integration uses WaveSpeed’s MiniMax H3 Video Edit, subject to live validation. Results preserve cleared template audio; no separate music rights are granted. This independent project is not affiliated with the original song or its artists.",
+        "Concept images are AI-generated. The model integration uses WaveSpeed’s Wan 3.0 Video Edit, subject to live validation. Results preserve cleared template audio; no separate music rights are granted. This independent project is not affiliated with the original song or its artists.",
       ],
       [
         "Availability and launch",

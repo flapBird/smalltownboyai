@@ -23,7 +23,7 @@ import { readApiResponse } from "@/lib/client-response";
 import { normalizePhoto } from "@/lib/normalize-photo";
 import { TemplatePicker } from "./template-picker";
 import { Button } from "./ui/button";
-import { SPECS, type Resolution } from "@/lib/catalog";
+import { SPECS, currentResolution, type Resolution } from "@/lib/catalog";
 import type { PublicTemplate } from "@/lib/templates";
 type Photo = { url: string; id?: string; sample?: boolean };
 type Task = {
@@ -157,9 +157,9 @@ export function Generator() {
             c.templates[0]?.id ||
             "living-room",
         );
-        const savedResolution = localStorage.getItem(
-          "smalltown-resolution",
-        ) as Resolution | null;
+        const savedResolution = currentResolution(
+          localStorage.getItem("smalltown-resolution") ?? "",
+        ) as Resolution;
         if (
           savedResolution &&
           Object.hasOwn(SPECS, savedResolution) &&
@@ -480,7 +480,11 @@ export function Generator() {
                   <label htmlFor={"character-" + i}>
                     <span>0{i + 1}</span> CHARACTER {i === 0 ? "A" : "B"}
                   </label>
-                  <small>{i === 0 ? "Foreground" : "Background"}</small>
+                  <small>
+                    {i === 0
+                      ? "Image 1 · Foreground at start"
+                      : "Image 2 · Background at start"}
+                  </small>
                 </div>
                 <div
                   className={"pet-dropzone " + (photos[i] ? "has-photo" : "")}

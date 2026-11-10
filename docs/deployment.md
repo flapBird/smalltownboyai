@@ -2,7 +2,7 @@
 
 2026-11-06 的远程检查已确认 Web / Jobs Worker、共享 D1、私有 R2 与 Cron 配置存在，但真实业务尚未验收。默认真实收款与生成均关闭。
 
-2026-11-07：本地已接入 **MiniMax H3 Video Edit、14 秒、两个可选模板、480p / 768p / 1080p**，尚未发布本轮改动或进行真实付费生成。不能把本地测试视为模型效果验收。
+2026-11-10：新任务改用 **Wan 3.0 Video Edit、14 秒、两个可选模板、480p / 720p / 1080p**。用户已试过 Wan 3.0 真人双角色样例；本站真实生成链路待验收。
 
 ## Cloudflare
 
@@ -22,7 +22,14 @@ npm run deploy
 npm run jobs:deploy
 ```
 
-`npm run deploy` 先构建，再使用 Vinext 生成的 `dist/server/wrangler.json`，不是直接部署原始 TS 入口。Cron Worker 每分钟运行，不能只部署 Web Worker。部署前 `--dry-run` 验证打包不能替代账户上的远程验证。
+`npm run deploy` 先构建，再使用 Vinext 生成的 `dist/server/wrangler.json`。Cron Worker 每分钟运行，需与 Web 一起更新。仓库维护者通过推送触发云端部署。已有环境可为两个 Worker 分别连接同一仓库的 `main` 分支：
+
+| Worker | Cloudflare Settings → Build 的 Deploy command |
+| --- | --- |
+| `smalltownboyai` | `npm run deploy` |
+| `smalltownboyai-jobs` | `npm run jobs:deploy` |
+
+两者都使用仓库根目录，Build command 可留空（Web 的部署脚本已包含构建；Jobs 由 Wrangler 打包）。推送后分别查看两个 Worker 的 Deployments，确认 Jobs 也生成了新版本。[Cloudflare Workers Builds 配置说明](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)
 
 ## GA4 与 Microsoft Clarity
 
@@ -62,14 +69,14 @@ Web Worker 需要 `WAFFO_MERCHANT_ID`、`WAFFO_PRIVATE_KEY`、`WAFFO_PRODUCT_LIT
 - R2 `smalltownboyai-private` 中已存在 `templates/living-room-14s.mp4` 和 `templates/red-fence-14s.mp4`。2026-11-07 读取 MP4 元数据，两段均为 14 秒且有音轨；客厅显示尺寸 540×960，红围栏约 539.5×960。未据此判定动作质量、配乐许可或生成效果合格。
 - `lib/templates.ts` 定义两套模板、版本及核对时的 ETag。首页可选择模板，默认选中一个，登录回跳保留选择；任务与历史记录模板 ID / 版本。每次生成只使用选定的一套模板和两张图片。
 - 服务端只接受白名单模板 ID。`/api/templates/:id/source` 使用限定模板、版本、ETag 与 30 分钟期限的签名；提交前核对源对象 ETag，读取时使用 R2 条件请求防止文件被替换。旧上传照片签名不能用于模板。
-- H3 请求指定 `duration:14`、`aspect_ratio:"9:16"`、两张参考图和 `generate_audio:false`，保留模板音轨。静音模板不会自动获得歌曲。中档使用用户确认的 **768p**，不假标 720p；不提供 540p 档。
-- 新任务冻结 100 / 200 / 400 积分，分别按 144 / 284 / 564 美分估算基础模型成本；套餐与费用说明已同步，旧订单仍保留原金额和积分。
+- Wan 3.0 请求使用 `duration:14`、`generate_audio:false`、`enable_prompt_expansion:false`，沿用模板画面比例和现有音轨。两个参考图按固定图框顺序发送：A / Image 1 对应开场前景，B / Image 2 对应开场背景。英文提示词要求沿原角色轨迹保持身份。
+- 新任务冻结 100 / 200 / 400 积分，分别按 140 / 280 / 560 美分估算基础模型成本；套餐与费用说明已同步，旧订单仍保留原金额和积分。
 - 新迁移 `0002_concerned_lightspeed.sql` 为任务增加可空的模板 ID / 版本，并更新套餐目录；保留历史 Seedance 任务、订单、余额和账本。远程数据库尚未执行该迁移。
 
 ### 仍需执行
 
 1. 核对两段素材的动作完整性、角色位置、音画同步及画面/配乐使用权限。源素材约 540p；高分辨率输出的细节和身份一致性必须实测，不能凭请求参数判断。
-2. 用 5 秒裁剪片 + 两张宠物图先测 H3 480p，再逐一测试两套 14 秒模板和准备开放的画质。记录实际账单、失败收费、耗时、尺寸、双角色稳定性与声音。测试会消耗 WaveSpeed 额度。
+2. 用短片及有权使用的双图先测 Wan 3.0 480p，再逐一测试两套 14 秒模板和准备开放的画质。记录实际账单、失败收费、耗时、尺寸、双角色稳定性与声音。测试会消耗 WaveSpeed 额度。
 3. 按下节配置凭据与开关；在受控测试环境开放已验证模板/画质，跑通登录 → 选模板 → 上传 → 输入审核 → 生成 → Jobs 回收 → 私有 R2 → 幂等结算 → 下载/历史/账本。验证失败释放、unknown 人工处理、签名到期、未验证模板和重复提交。
 4. 应用远程迁移后发布 Web / Jobs；配置正式域名、Google OAuth、管理员、支持邮箱、运营主体和政策，检查 Cron 实际执行及输出域名白名单。
 5. 完成 Waffo sandbox 付款、重发、退款与正式商户配置，确认新商品金额，再开放收款。首页现为明确标注的源模板视频预览；后续用审核通过的真实成片补充生成样例，示例放 `examples/` 并单独提供受控公开读取；用户上传和私人结果保持私有。
@@ -82,24 +89,24 @@ Web Worker 需要 `WAVESPEED_API_KEY`、`MEDIA_SIGNING_SECRET`，不再读取 `R
 - `TEMPLATE_PREVIEWS_ENABLED=true`：发布两套已选定模板的首页/选择器预览，仓库 Web Worker 配置已开启；只开放白名单 `/api/templates/:id/preview`，仍验证 ETag，不开放任意 R2 键、用户上传或私人成片。与付费生成开关独立。
 - `REFERENCE_LICENSE_CONFIRMED=true`：在确认模板可用于真实生成后设置，仍是付费生成的必要条件；兼容旧配置，也可启用模板预览。两项均关闭时前端显示预览待开放。本地 Mock 有 ETag 匹配的模板时预览源片，否则播放明确标注的测试动画。
 - `VERIFIED_TEMPLATES=living-room,red-fence`：只填已通过真实测试的模板 ID，可先仅启用一套。任务提交、签名源访问均检查该白名单。修改模板文件会导致 ETag 不匹配并阻止使用；换素材应使用新对象键、更新模板版本及 ETag、重新验证，不要覆盖已发布版本。
-- `VERIFIED_RESOLUTIONS=480p,768p,1080p`：只填已验证规格，旧值 `720p` 会被忽略。支持能力不代表三档都已通过测试。
-- `GENERATION_ENABLED=true`：只有凭据、许可、模板和画质配置齐全才可提交真实请求；本轮保持关闭。供应商必须能通过站点域名访问短期签名链接，Cloudflare 后台地址不能当作视频 URL。实测排队取件时间应在签名期限内。
+- `VERIFIED_RESOLUTIONS=480p,720p,1080p`：只填已验证规格，旧后台设置或变量中的 `768p` 会在读取时映射为 `720p`，历史任务记录保持原画质。支持能力不代表三档都已通过测试。
+- `GENERATION_ENABLED=true`：只有凭据、许可、模板和画质配置齐全才可提交真实请求；本轮不修改线上开关。供应商必须能通过站点域名访问短期签名链接，Cloudflare 后台地址不能当作视频 URL。实测排队取件时间应在签名期限内。
 
 Jobs Worker 也必须设置 `WAVESPEED_API_KEY`；`OUTPUT_HOSTS` 填供应商实测返回的精确 HTTPS CDN 主机名（逗号分隔，无通配符），拒绝重定向下载，最大 50 MiB。Web Worker 的可选同名配置不会替代 Jobs 配置。
 
-输入自动检测通过后提交；输出复制到 R2 后进入 `review` 等待自动检测，Jobs 在检测通过后自动交付并幂等结算。被拦截或无法完成检测的成片继续保持私有，支持管理员处理异常和申诉。模板上线验收仍需检查尺寸、时长、角色映射与音轨。官方参数依据：[MiniMax H3 Video Edit](https://wavespeed.ai/models/wavespeed-ai/minimax-h3/video-edit)（2026-11-07 核对）。
+输入自动检测通过后提交；输出复制到私有 R2 后完成任务并幂等结算。旧 `review` 成片可由新 Jobs 定时恢复，也可由任务所有者打开 My Videos 时恢复。模板验收需检查尺寸、时长、角色映射与音轨。官方参数依据：[Wan 3.0 Video Edit](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-3.0-video-edit)（2026-11-10 核对）。
 
 ## 异常恢复与保留
 
 - 提交请求最多等待 25 秒；不确定是否被供应商接受时状态为 `unknown`，保留冻结积分，禁止自动重发收费提交。人工去供应商核实、记录任务或账单证据后处理。
 - 未开始提交的 `queued` 超过 2 分钟释放冻结。`submitting` 超过 2 分钟转 unknown。处理中的任务超过 24 小时且尚无终态，转 unknown。查询失败可重试，提交不自动重试。
-- 结果先进入私有 R2 和自动检测；用户完成前不能访问。失败释放积分不代表供应商一定没有计费，实际费用须对账录入。
+- 结果先归档到私有 R2；任务完成后仅账号所有者可下载。失败释放积分不代表供应商一定没有计费，实际费用须对账录入。
 - 用户删除完成/失败视频会删除 R2 输出，并保留任务 tombstone 与资金账本来阻止请求重放。未被未删除任务引用且超过 24 小时的图片由 Cron 清理；活跃历史所引用的输入保留用于追溯。账户数据删除请求通过支持邮箱人工处理；暂不提供自助删号。
 - `release-unknown` 只在确认不应交付后释放，不会自动追回供应商费用。管理员补偿与暂停动作需填写原因，保留审计。
 
 ## 开放真实服务前仍需验证
 
-Google 回调；Waffo sandbox 完整付款、重发、乱序、退款；迁移后 WaveSpeed H3 已选规格与两个模板的完整 14 秒、身份与动作、耗时、实际费用和失败收费；远程 D1/R2 权限；Cron 实际执行与输出 CDN；邮箱真实可达；合法运营主体、政策文本和商户批准。当前法律页面明确处于预览状态，没有编造公司名称和地址。
+Google 回调；Waffo sandbox 完整付款、重发、乱序、退款；迁移后 WaveSpeed Wan 3.0 已选规格与两个模板的完整 14 秒、身份与动作、耗时、实际费用和失败收费；远程 D1/R2 权限；Cron 实际执行与输出 CDN；邮箱真实可达；合法运营主体、政策文本和商户批准。当前法律页面明确处于预览状态，没有编造公司名称和地址。
 
 若 14 秒规格的真实费用不合适，保持关闭并报告，不能擅自改套餐、重复短片或伪造分辨率。模型和商户文档可更新，上线时须重新核对。
 
@@ -107,9 +114,9 @@ Google 回调；Waffo sandbox 完整付款、重发、乱序、退款；迁移�
 
 1. 发布代码前先对 D1 应用 `0003`（检测记录、890/1990/3990 美分套餐价格）及 `0004`（索引）迁移；已有订单金额、积分和余额不变。先在测试环境验证，生产迁移需要单独执行。
 2. 网页 Worker `smalltownboyai` 与定时任务 Worker `smalltownboyai-jobs` 均设置 Secret `SEEAPI_API_KEY`，并配置相同的 `MEDIA_SIGNING_SECRET`。两者 `APP_ORIGIN=https://smalltownboyai.one`，连接同一 D1/R2。密钥只保存在服务端。
-3. SeeAPI 控制台单独设置该 Key 的每日额度上限。应用 `SEEAPI_DAILY_CHECK_LIMIT` 默认 100 个新检测/UTC 日（最大 1000）；每账户每日最多 30 个、同时最多 4 个待检测项。次数上限不是固定金额上限。确认 SeeAPI 当前单价与实际 `consumed_credits`，检测费用不包含在 H3 模型成本估算中。
+3. SeeAPI 控制台单独设置该 Key 的每日额度上限。应用 `SEEAPI_DAILY_CHECK_LIMIT` 默认 100 个新检测/UTC 日（最大 1000）；每账户每日最多 30 个、同时最多 4 个待检测项。次数上限不是固定金额上限。确认 SeeAPI 当前单价与实际 `consumed_credits`，检测费用不包含在 Wan 3.0 模型成本估算中。
 4. 部署网页及 jobs Worker，确认每分钟 cron 正常执行。现有 `GENERATION_ENABLED`、模型/模板验证、授权确认、生成前提示词、输入图片和模板自动检测仍需通过；缺失检测密钥不会绕过检测。
-5. 新输入检测只接受 JPG/PNG ≤8 MiB、每边256–4096、总像素至少78,400。视频为可解析 MP4 ≤30秒、≤50 MiB。先核对余额/权限/素材限制，再检查实际提示词、两张图片、模板视频；全部通过才冻结积分并提交 H3。
+5. 新输入检测只接受 JPG/PNG ≤8 MiB、每边256–4096、总像素至少78,400。视频为可解析 MP4 ≤30秒、≤50 MiB。先核对余额/权限/素材限制，再检查实际提示词、两张图片、模板视频；全部通过才冻结积分并提交 Wan 3.0。
 6. 成片由 Jobs 从白名单域名取回，校验 MP4 格式/大小并写入私有 R2，随后完成任务并幂等结算积分。不再提交或轮询成片 SeeAPI 检测；预览/下载仍要求登录、任务所有权和 completed 状态。输入检测失败/超时仍阻止生成。
 7. 持久化记录保存原始请求正文、幂等键和供应商ID，最多12次尝试/20分钟。丢失POST响应重放相同正文和键，已知ID只查询。不可用的终态交由运维核对供应商ID；不要删除记录或换键盲目重试。若需重试策略/模型变更，先查清旧任务结算，再显式升级策略版本。
 8. Waffo 需创建/核对 $8.90、$19.90、$39.90 的一次性USD商品，更新对应 `WAFFO_PRODUCT_*`。测试环境验证金额匹配、重复回调、到账及退款后再启用支付。本站代码改价不会自动修改 Waffo 后台商品。
@@ -129,18 +136,18 @@ Google 回调；Waffo sandbox 完整付款、重发、乱序、退款；迁移�
 
 ## 管理员测试积分（无需支付）
 
-`GENERATION_ENABLED` 是真实 H3 生成入口的总开关，与 `PAYMENTS_ENABLED` 独立。`false` 禁止新建真实生成任务，不关闭首页模板预览，不取消已经提交给供应商的任务。`true` 仍要求 WaveSpeed/SeeAPI/媒体签名密钥、模板与分辨率验证、素材授权、充足积分和画质权限、自动输入 NSFW 检测，以及后台没有暂停生成。无需为了内部测试开启支付。
+`GENERATION_ENABLED` 是真实 Wan 3.0 生成入口的总开关，与 `PAYMENTS_ENABLED` 独立。`false` 禁止新建真实生成任务，不关闭首页模板预览，不取消已经提交给供应商的任务。`true` 仍要求 WaveSpeed/SeeAPI/媒体签名密钥、模板与分辨率验证、素材授权、充足积分和画质权限、自动输入 NSFW 检测，以及后台没有暂停生成。无需为了内部测试开启支付。
 
 1. 发布前应用 `0006_happy_dazzler.sql`，新增独立的管理员积分赠送记录。支付/退款的画质权限计算也依赖此表，须先迁移再发布。
 2. 收款账号必须先登录一次。运维将可信操作员的 `user.role` 设置为 `admin`（首次管理员初始化仍需 D1）；不要直接改钱包余额。没有自助提升管理员权限的入口。
-3. 管理员登录后访问 `/admin`，在 **Grant test credits** 填收款邮箱、积分数（1–10000）、最高画质和至少5字符的原因。默认600积分、最高1080p，可自行调整。600积分可用于一次1080p（400）和一次768p（200）。
+3. 管理员登录后访问 `/admin`，在 **Grant test credits** 填收款邮箱、积分数（1–10000）、最高画质和至少5字符的原因。默认600积分、最高1080p，可自行调整。600积分可用于一次1080p（400）和一次720p（200）。
 4. 提交后显示实际到账、当前余额、冻结积分及记录编号。流水类型为 `admin_grant`，不创建 Waffo 订单、不伪造支付事件；操作员、对象、原因、数量和画质都有记录。相同请求键重复提交只到账一次；网络失败时在原页面以不变内容重试，不要重新填写另一笔赠送。
 5. 赠送画质权限不会因其他付费订单退款而丢失，也不会因低画质赠送而降级。该赠送无现金退款价值；本入口不提供撤回赠送功能。赠送本身不调用模型或支付，真实生成/检测仍消耗供应商账户余额。
-6. 测试顺序：赠送→上传双图→满足生成启用条件→提交/自动等待内容检测→H3生成→成片归档→自动交付与下载。此路径验证生成和账本，不代替支付成功/退款 Webhook 联调。
+6. 测试顺序：赠送→上传双图→满足生成启用条件→提交/自动等待内容检测→Wan 3.0生成→成片归档→自动交付与下载。此路径验证生成和账本，不代替支付成功/退款 Webhook 联调。
 
 ## Waffo 前置文字审核与后台二次认证
 
-生成提示词改由 Waffo `contentSafety.scanPrompt` 检测，使用实际 H3_PROMPT、semantic=enforce，仅 allow 放行；未配置、异常或拒绝均不调用生成。SeeAPI 保留图片和模板检测，不再发起或轮询旧文字检测。网页 Worker 需配置 WAFFO_MERCHANT_ID 与 WAFFO_PRIVATE_KEY，即使 PAYMENTS_ENABLED=false 也需要这两个值以运行文字检测。此调整不代表已完成真实接口联调。
+生成提示词改由 Waffo `contentSafety.scanPrompt` 检测，使用实际提交给模型的英文提示词、semantic=enforce，仅 allow 放行；未配置、异常或拒绝均不调用生成。SeeAPI 保留图片和模板检测，不再发起或轮询旧文字检测。网页 Worker 需配置 WAFFO_MERCHANT_ID 与 WAFFO_PRIVATE_KEY，即使 PAYMENTS_ENABLED=false 也需要这两个值以运行文字检测。此调整不代表已完成真实接口联调。
 
 后台需同时满足：Google 已登录、数据库 role=admin、邮箱位于 ADMIN_EMAILS（逗号分隔）、输入 ADMIN_PASSWORD。ADMIN_PASSWORD 在 Cloudflare 设置为 Secret；不写入客户端或公开变量。解锁签发绑定用户的 HttpOnly/SameSite Cookie，有效30分钟；修改密码使旧凭据失效。所有 /api/admin 路由（含视频预览）均检查认证，密码错误有每用户5次/5分钟限流。缺配置默认拒绝；不提供公共自助提权。
 

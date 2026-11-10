@@ -1,16 +1,27 @@
 import { SPECS, type Resolution } from "../catalog";
-export const H3_PROMPT =
-  "Replace the foreground character with the pet in the first reference image and the background character with the pet in the second reference image. Preserve each pet identity, the original camera rhythm, exaggerated reaction, background dance, playful interaction and final two-character dance. Nonhuman pets only. Preserve the source audio and its timing. Do not add text.";
+export const WAN_MODEL = "alibaba/wan-3.0/video-edit";
 export type SubjectMode = "human" | "pet";
+
 export function generationPrompt(mode: SubjectMode = "pet") {
-  if (mode === "pet") return H3_PROMPT;
-  return "Replace BOTH original subjects in the source video with the two consenting adults shown in the reference images. Reference image 1 is the foreground performer; reference image 2 is the background performer. Keep each person's face, hair and identity recognizable and distinct throughout every shot. Use natural human bodies, clothing and hands, not animal bodies or costumes. Remove the original animal subjects completely. Transfer only the source choreography, camera movement, timing and environment. Preserve source audio and timing. Do not return the unchanged source video. Do not add text.";
+  const subjects = mode === "human" ? "two consenting adults" : "two pets";
+  const identity =
+    mode === "human"
+      ? "Preserve each person's facial features, hairstyle, identity, and gender presentation. Use natural human bodies."
+      : "Preserve each pet's face, species, coat, and markings. Keep both characters nonhuman.";
+  return [
+    `Edit Video 1 by replacing its two main characters with the ${subjects} in Image 1 and Image 2.`,
+    "Character A is the subject in Image 1. Replace the character who gives the exaggerated reaction in the foreground close-up at the start with A.",
+    "Character B is the subject in Image 2. Replace the character dancing in the background at the start with B.",
+    `Track each original character's motion throughout Video 1. Keep A on A's track and B on B's track, even when they trade places, the shot cuts, one blocks the other, or both approach the camera. ${identity}`,
+    "Preserve the choreography, hands-on-head reaction, position changes, interaction, rhythm, camera movement, edit order, and background. Change only the two characters' appearances.",
+    "Keep both identities distinct and consistent from first frame to last. Do not mix faces, swap identities, merge characters, change gender, or add a third character.",
+    "Keep the original duration, vertical 9:16 framing, action timing, and audio. No subtitles, watermark, or added dialogue.",
+  ].join("\n\n");
 }
-export const H3_MODEL = "wavespeed-ai/minimax-h3/video-edit";
 export function estimateCost(inputDuration: number, resolution: Resolution) {
-  // Input rounds up; output is explicitly set to the same integer duration. Two images.
+  // Wan bills the rounded input duration plus the requested output duration.
   return Math.round(
-    (Math.ceil(inputDuration) * 2 * SPECS[resolution].rate + 0.04) * 100,
+    Math.ceil(inputDuration) * 2 * SPECS[resolution].rate * 100,
   );
 }
 export interface GenerationInput {
@@ -41,9 +52,9 @@ export class WaveSpeed implements VideoGenerationProvider {
   validateInput(i: GenerationInput) {
     if (
       !Number.isInteger(i.inputDuration) ||
-      i.inputDuration < 3 ||
+      i.inputDuration < 2 ||
       i.inputDuration > 15 ||
-      !SPECS[i.resolution]
+      !Object.hasOwn(SPECS, i.resolution)
     )
       throw new Error("Unsupported video specification.");
     for (const u of [i.video, ...i.images])
@@ -58,7 +69,7 @@ export class WaveSpeed implements VideoGenerationProvider {
     this.validateInput(i);
     const r = await this.transport.call(
       globalThis,
-      "https://api.wavespeed.ai/api/v3/" + H3_MODEL,
+      "https://api.wavespeed.ai/api/v3/" + WAN_MODEL,
       {
         method: "POST",
         headers: {
@@ -71,7 +82,7 @@ export class WaveSpeed implements VideoGenerationProvider {
           reference_images: i.images,
           resolution: i.resolution,
           duration: i.inputDuration,
-          aspect_ratio: "9:16",
+          enable_prompt_expansion: false,
           generate_audio: false,
           prompt: generationPrompt(i.subjectMode),
         }),
@@ -113,7 +124,7 @@ export class WaveSpeed implements VideoGenerationProvider {
       status:
         d.status === "completed"
           ? "completed"
-          : d.status === "failed"
+          : ["failed", "cancelled", "timeout", "deleted"].includes(d.status)
             ? "failed"
             : "processing",
       url: d.outputs?.[0],

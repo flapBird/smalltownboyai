@@ -88,7 +88,7 @@ async function user(balance = 600, tier = 3) {
 }
 const input = (
   assets: string[],
-  resolution: "480p" | "768p" | "1080p" = "480p",
+  resolution: "480p" | "720p" | "1080p" = "480p",
 ) => ({
   templateId: "living-room",
   assetA: assets[0],
@@ -145,7 +145,7 @@ describe("D1 money and task invariants", () => {
   it("rejects higher resolution for Lite even with enough credits", async () => {
     const u = await user(1000, 1);
     await expect(
-      reserveTask(db, u.id, input(u.assets, "768p"), true),
+      reserveTask(db, u.id, input(u.assets, "720p"), true),
     ).rejects.toThrow();
     expect((await wallet(u.id))?.balance).toBe(1000);
   });
@@ -375,17 +375,17 @@ describe("signed webhooks and provider contract", () => {
       resolution: "480p" as const,
       inputDuration: 14,
     };
-    expect(p.calculateCost(i)).toBe(144);
+    expect(p.calculateCost(i)).toBe(140);
     expect(await p.submitTask(i)).toBe("real-shape-id");
     expect(JSON.parse(transport.mock.calls[0][1].body)).toMatchObject({
       generate_audio: false,
       duration: 14,
-      aspect_ratio: "9:16",
+      enable_prompt_expansion: false,
       resolution: "480p",
       reference_images: i.images,
     });
     expect(transport.mock.calls[0][0]).toBe(
-      "https://api.wavespeed.ai/api/v3/wavespeed-ai/minimax-h3/video-edit",
+      "https://api.wavespeed.ai/api/v3/alibaba/wan-3.0/video-edit",
     );
     expect(await p.queryTask("real-shape-id")).toMatchObject({
       status: "completed",
@@ -651,7 +651,7 @@ describe("recovery and deletion regressions", () => {
       (await handle(new Request("http://localhost/api/config"), env)).json();
     expect(await read(conf)).toMatchObject({
       generation: true,
-      resolutions: ["480p", "768p"],
+      resolutions: ["480p", "720p"],
     });
     expect(await read({ ...conf, WAVESPEED_API_KEY: undefined })).toMatchObject(
       { generation: false, resolutions: [] },
@@ -695,12 +695,12 @@ describe("recovery and deletion regressions", () => {
   });
 });
 
-describe("H3 templates, prices and private source access", () => {
-  it("charges 100/200/400 credits and snapshots H3 base costs with both images", async () => {
+describe("Wan templates, prices and private source access", () => {
+  it("charges 100/200/400 credits and snapshots Wan base costs", async () => {
     for (const [resolution, credits, cost] of [
-      ["480p", 100, 144],
-      ["768p", 200, 284],
-      ["1080p", 400, 564],
+      ["480p", 100, 140],
+      ["720p", 200, 280],
+      ["1080p", 400, 560],
     ] as const) {
       const u = await user();
       const { task } = await reserveTask(
@@ -715,7 +715,7 @@ describe("H3 templates, prices and private source access", () => {
         input_duration: 14,
         template_id: "red-fence",
         template_version: 1,
-        model: "wavespeed-ai/minimax-h3/video-edit",
+        model: "alibaba/wan-3.0/video-edit",
       });
       expect(await wallet(u.id)).toMatchObject({
         balance: 600 - credits,
@@ -775,7 +775,7 @@ describe("H3 templates, prices and private source access", () => {
         .first(),
     ).toEqual({ cents: 890 });
   });
-  it("rejects unsupported H3 duration and resolution before any paid request", async () => {
+  it("rejects unsupported Wan duration and resolution before any paid request", async () => {
     const transport = vi.fn();
     const p = new WaveSpeed("key", transport);
     const i = {
@@ -787,12 +787,12 @@ describe("H3 templates, prices and private source access", () => {
       resolution: "480p" as const,
       inputDuration: 14,
     };
-    for (const inputDuration of [2, 16, 21, NaN, 14.2])
+    for (const inputDuration of [1, 16, 21, NaN, 14.2])
       await expect(p.submitTask({ ...i, inputDuration })).rejects.toThrow(
         "Unsupported",
       );
     await expect(
-      p.submitTask({ ...i, resolution: "720p" as "480p" }),
+      p.submitTask({ ...i, resolution: "768p" as "480p" }),
     ).rejects.toThrow("Unsupported");
     expect(transport).not.toHaveBeenCalled();
   });
@@ -875,11 +875,11 @@ describe("H3 templates, prices and private source access", () => {
     expect(JSON.stringify(config)).not.toContain("objectKey");
     expect(JSON.stringify(config)).not.toContain("etag");
   });
-  it("accepts the chosen template through the API and rejects old 720p", async () => {
+  it("uses 720p for new tasks and replays a historical 768p task without changing it", async () => {
     const u = await user();
     const headers = await authenticated(u.id);
     const b = {
-      ...input(u.assets, "768p"),
+      ...input(u.assets, "720p"),
       templateId: "red-fence",
       consent: true,
     };
@@ -894,13 +894,23 @@ describe("H3 templates, prices and private source access", () => {
       );
     const r = await send(b);
     expect(r.status).toBe(201);
-    expect(await r.json()).toMatchObject({
+    const task = (await r.json()) as { id: string };
+    expect(task).toMatchObject({
       template_id: "red-fence",
       template_version: 1,
-      resolution: "768p",
+      resolution: "720p",
       credits: 200,
     });
-    expect((await send({ ...b, resolution: "720p" })).status).toBe(400);
+    await db
+      .prepare("UPDATE video_tasks SET resolution='768p' WHERE id=?")
+      .bind(task.id)
+      .run();
+    const replay = await send(b);
+    expect(replay.status).toBe(201);
+    expect(await replay.json()).toMatchObject({
+      id: task.id,
+      resolution: "768p",
+    });
     expect(await wallet(u.id)).toMatchObject({ balance: 400, reserved: 200 });
   });
 });
@@ -1148,12 +1158,16 @@ describe("durable safety gates", () => {
         .prepare("UPDATE moderation_checks SET state='passed' WHERE id=?")
         .bind(checks[1].id)
         .run();
-      expect(
-        await moderateInputs(env, u.id, {
-          ...input(u.assets),
-          subjectMode: "human",
-        }),
-      ).toHaveLength(2);
+      const [image1, image2] = await moderateInputs(env, u.id, {
+        ...input(u.assets),
+        subjectMode: "human",
+      });
+      expect(new URL(image1).pathname).toBe(
+        "/api/moderation-media/" + checks[0].id,
+      );
+      expect(new URL(image2).pathname).toBe(
+        "/api/moderation-media/" + checks[1].id,
+      );
       const { generationPrompt } = await import("../lib/providers/wavespeed");
       expect(prompt).toHaveBeenLastCalledWith(env, generationPrompt("human"));
       const { task } = await reserveTask(db, u.id, input(u.assets), false);
@@ -1779,6 +1793,14 @@ it("admin generation settings override legacy variables and enforce per-template
     expect(resolved.VERIFIED_TEMPLATES).toBe("living-room");
     expect(resolved.VERIFIED_RESOLUTIONS).toBe("480p");
     expect(resolved.REFERENCE_LICENSE_CONFIRMED).toBe("true");
+    await db
+      .prepare("UPDATE settings SET value=? WHERE key='generation_config'")
+      .bind(JSON.stringify({ ...config, resolutions: ["480p", "768p"] }))
+      .run();
+    expect((await readGenerationSettings(e)).resolutions).toEqual([
+      "480p",
+      "720p",
+    ]);
     await saveGenerationSettings(e, u.id, {
       ...config,
       resolutions: [],
@@ -1982,4 +2004,49 @@ it("retired output checks do not occupy input screening concurrency slots", asyn
     { key, etag: obj!.etag },
   );
   expect(inputCheck.state).toBe("pending");
+});
+
+it("recovers a stored review task when its owner opens the video list, without a cron run", async () => {
+  const owner = await user();
+  const stranger = await user();
+  const { task } = await reserveTask(db, owner.id, input(owner.assets), false);
+  const key = `outputs/${owner.id}/${task.id}.mp4`;
+  await e.MEDIA.put(key, readFileSync("public/fixtures/mock.mp4"));
+  await db
+    .prepare(
+      "UPDATE video_tasks SET status='review',output_key=?,error_code='SAFETY_UNAVAILABLE' WHERE id=?",
+    )
+    .bind(key, task.id)
+    .run();
+  const list = async (userId: string) =>
+    handle(
+      new Request("http://localhost/api/tasks", {
+        headers: await authenticated(userId),
+      }),
+      e,
+    );
+  expect(await (await list(stranger.id)).json()).toEqual([]);
+  expect(await wallet(owner.id)).toMatchObject({ balance: 500, reserved: 100 });
+  for (let i = 0; i < 2; i++) {
+    const response = await list(owner.id);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([
+      expect.objectContaining({
+        id: task.id,
+        status: "completed",
+        error_code: null,
+      }),
+    ]);
+  }
+  expect(await wallet(owner.id)).toMatchObject({ balance: 500, reserved: 0 });
+  expect(
+    (
+      await db
+        .prepare(
+          "SELECT COUNT(*) n FROM credit_transactions WHERE business_key=?",
+        )
+        .bind("settle:" + task.id)
+        .first()
+    )?.n,
+  ).toBe(1);
 });

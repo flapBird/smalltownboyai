@@ -38,7 +38,7 @@ export default function Home() {
             <div className="intro-facts">
               <span>Two character photos</span>
               <span>14 seconds · 9:16</span>
-              <span>480p · 768p · 1080p</span>
+              <span>480p · 720p · 1080p</span>
             </div>
             <p className="intro-availability">
               Currently in preview. Live generation is not yet available. Videos
@@ -75,9 +75,9 @@ export default function Home() {
               <span className="step-number">02</span>
               <h3>Add your two stars</h3>
               <p>
-                Upload one clear photo per person or pet. Character A appears in
-                the foreground; character B takes the background. Use well-lit
-                photos with an unobstructed face.
+                Upload one clear photo per person or pet. Image 1 goes in
+                Character A for the opening foreground role; Image 2 goes in
+                Character B for the opening background role.
               </p>
             </li>
             <li>
@@ -93,8 +93,8 @@ export default function Home() {
               <span className="step-number">04</span>
               <h3>Preview and download</h3>
               <p>
-                Track the task in My Videos. Once the video is complete and
-                approved, preview it and download your MP4.
+                Track the task in My Videos. Once the video is ready, preview it
+                and download your MP4.
               </p>
             </li>
           </ol>

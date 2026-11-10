@@ -6,7 +6,7 @@ it.each(["human", "pet"] as const)(
   async (mode) => {
     const bundled = await build({
       stdin: {
-        contents: `import {WaveSpeed} from './lib/providers/wavespeed'; export default {async fetch(){const client=new WaveSpeed('test');const id=await client.submitTask({subjectMode:'${mode}',video:'https://media.test/template.mp4',images:['https://media.test/a.png','https://media.test/b.png'],resolution:'480p',inputDuration:14});return Response.json(await client.queryTask(id));}};`,
+        contents: `import {WaveSpeed} from './lib/providers/wavespeed'; export default {async fetch(){const client=new WaveSpeed('test');const id=await client.submitTask({subjectMode:'${mode}',video:'https://media.test/template.mp4',images:['https://media.test/a.png','https://media.test/b.png'],resolution:'720p',inputDuration:14});return Response.json(await client.queryTask(id));}};`,
         resolveDir: process.cwd(),
       },
       bundle: true,
@@ -24,11 +24,26 @@ it.each(["human", "pet"] as const)(
           calls.push(request.method);
           if (request.method === "POST") {
             const body: any = await request.json();
-            expect(body.prompt).toContain(
-              mode === "human" ? "two consenting adults" : "Nonhuman pets only",
+            expect(new URL(request.url).pathname).toBe(
+              "/api/v3/alibaba/wan-3.0/video-edit",
             );
-            if (mode === "human")
-              expect(body.prompt).not.toContain("Nonhuman pets only");
+            expect(body).toMatchObject({
+              video: "https://media.test/template.mp4",
+              resolution: "720p",
+              duration: 14,
+              generate_audio: false,
+              enable_prompt_expansion: false,
+            });
+            expect(body).not.toHaveProperty("aspect_ratio");
+            expect(body.prompt).toContain(
+              mode === "human" ? "two consenting adults" : "two pets",
+            );
+            expect(body.prompt).toContain(
+              "Character A is the subject in Image 1.",
+            );
+            expect(body.prompt).toContain(
+              "Character B is the subject in Image 2.",
+            );
             expect(body.reference_images).toEqual([
               "https://media.test/a.png",
               "https://media.test/b.png",

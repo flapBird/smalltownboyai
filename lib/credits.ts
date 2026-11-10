@@ -1,6 +1,6 @@
-import { SPECS, type Resolution } from "./catalog";
+import { SPECS, currentResolution, type Resolution } from "./catalog";
 import { AppError } from "./auth";
-import { H3_MODEL, estimateCost } from "./providers/wavespeed";
+import { WAN_MODEL, estimateCost } from "./providers/wavespeed";
 import { getTemplate } from "./templates";
 export interface TaskRow {
   id: string;
@@ -8,7 +8,7 @@ export interface TaskRow {
   request_key: string;
   status: string;
   subject_mode: "human" | "pet";
-  resolution: Resolution;
+  resolution: Resolution | "768p";
   credits: number;
   asset_a: string;
   asset_b: string;
@@ -52,7 +52,7 @@ export async function reserveTask(
       existing.subject_mode !== (input.subjectMode ?? "pet") ||
       existing.asset_a !== input.assetA ||
       existing.asset_b !== input.assetB ||
-      existing.resolution !== input.resolution ||
+      currentResolution(existing.resolution) !== input.resolution ||
       existing.template_id !== input.templateId
     )
       throw new AppError(409, "This request key belongs to a different task.");
@@ -83,7 +83,7 @@ export async function reserveTask(
         input.assetA,
         input.assetB,
         mock ? "mock" : "wavespeed",
-        mock ? "local-test-animation" : H3_MODEL,
+        mock ? "local-test-animation" : WAN_MODEL,
         template.id,
         template.version,
         template.duration,

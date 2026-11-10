@@ -19,7 +19,7 @@ export const PACKAGES = [
     cents: 1990,
     credits: 300,
     tier: 2,
-    resolution: "768p",
+    resolution: "720p",
     description: "Give your favorite duo their moment.",
   },
   {
@@ -34,10 +34,21 @@ export const PACKAGES = [
 ] as const;
 export const SPECS = {
   "480p": { credits: 100, tier: 1, rate: 0.05 },
-  "768p": { credits: 200, tier: 2, rate: 0.1 },
+  "720p": { credits: 200, tier: 2, rate: 0.1 },
   "1080p": { credits: 400, tier: 3, rate: 0.2 },
 } as const;
-export type Resolution = keyof typeof SPECS;
+export const RESOLUTIONS = ["480p", "720p", "1080p"] as const;
+export type Resolution = (typeof RESOLUTIONS)[number];
+
+// Existing settings and unfinished browser requests used 768p for the middle tier.
+export function currentResolution(value: string) {
+  return value === "768p" ? "720p" : value;
+}
+export function configuredResolutions(values: string[]) {
+  return [...new Set(values.map(currentResolution))].filter(
+    (value): value is Resolution => RESOLUTIONS.some((r) => r === value),
+  );
+}
 export const TIER_NAMES = ["Free", "Lite", "Standard", "Pro"];
 export const FAQ = [
   [
@@ -54,11 +65,11 @@ export const FAQ = [
   ],
   [
     "How long is the video, and which resolutions are supported?",
-    "The generator requests a 14-second vertical MP4 in 480p, 768p or 1080p. The studio shows the templates and resolutions currently enabled for your account.",
+    "The generator requests a 14-second vertical MP4 in 480p, 720p or 1080p. The studio shows the templates and resolutions currently enabled for your account.",
   ],
   [
     "How many credits will a video cost?",
-    "Generation costs are 100 credits for 480p, 200 for 768p and 400 for 1080p. Credits do not expire. Resolution access depends on your highest eligible purchase, separately from your current balance.",
+    "Generation costs are 100 credits for 480p, 200 for 720p and 400 for 1080p. Credits do not expire. Resolution access depends on your highest eligible purchase, separately from your current balance.",
   ],
   [
     "How long does generation take?",
@@ -66,7 +77,7 @@ export const FAQ = [
   ],
   [
     "Can I download the result, and is music included?",
-    "Videos that complete generation and pass safety checks are downloadable as private MP4 files. The local preview provides a clearly marked test animation. Live results preserve the selected template’s cleared audio. The original song is not promised; no separate music rights are granted.",
+    "Videos are downloadable after generation and private storage complete as private MP4 files. The local preview provides a clearly marked test animation. Live results preserve the selected template’s cleared audio. The original song is not promised; no separate music rights are granted.",
   ],
   [
     "What happens if generation fails?",

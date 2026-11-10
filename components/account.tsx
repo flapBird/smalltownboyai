@@ -525,7 +525,7 @@ function GenerationSettingsForm() {
         >
           <fieldset>
             <legend>Available resolutions</legend>
-            {(["480p", "768p", "1080p"] as const).map((r) => (
+            {(["480p", "720p", "1080p"] as const).map((r) => (
               <label key={r}>
                 <input
                   type="checkbox"
@@ -676,7 +676,7 @@ function CreditGrantForm({ onGranted }: { onGranted: () => Promise<void> }) {
           Resolution access
           <select name="tier" defaultValue="3">
             <option value="1">480p</option>
-            <option value="2">Up to 768p</option>
+            <option value="2">Up to 720p</option>
             <option value="3">Up to 1080p</option>
           </select>
         </label>

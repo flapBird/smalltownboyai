@@ -82,8 +82,8 @@ export function Pricing({
                 {p.id === "lite"
                   ? "1 × 480p video"
                   : p.id === "standard"
-                    ? "3 × 480p or 1 × 768p + 1 × 480p"
-                    : "6 × 480p, 3 × 768p or 1 × 1080p + 1 × 768p"}
+                    ? "3 × 480p or 1 × 720p + 1 × 480p"
+                    : "6 × 480p, 3 × 720p or 1 × 1080p + 1 × 720p"}
               </li>
               <li>
                 <Check size={16} />

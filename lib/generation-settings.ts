@@ -1,10 +1,11 @@
 import { z } from "zod";
 import type { Bindings } from "./env";
 import { TEMPLATES } from "./templates";
+import { RESOLUTIONS, configuredResolutions } from "./catalog";
 import { AppError } from "./auth";
 export const generationSettingsSchema = z
   .object({
-    resolutions: z.array(z.enum(["480p", "768p", "1080p"])).max(3),
+    resolutions: z.array(z.enum(RESOLUTIONS)).max(3),
     templates: z
       .array(
         z.object({
@@ -36,15 +37,19 @@ export async function readGenerationSettings(
   const row = await e.DB.prepare(
     "SELECT value FROM settings WHERE key='generation_config'",
   ).first<{ value: string }>();
-  if (row) return generationSettingsSchema.parse(JSON.parse(row.value));
+  if (row) {
+    const saved = JSON.parse(row.value);
+    const resolutions = z.array(z.string()).parse(saved.resolutions);
+    return generationSettingsSchema.parse({
+      ...saved,
+      resolutions: configuredResolutions(resolutions),
+    });
+  }
   // One-time transition: existing installations retain their old configuration until saved in admin.
   return {
-    resolutions: (e.VERIFIED_RESOLUTIONS || "")
-      .split(",")
-      .map((v) => v.trim())
-      .filter((v): v is "480p" | "768p" | "1080p" =>
-        ["480p", "768p", "1080p"].includes(v),
-      ),
+    resolutions: configuredResolutions(
+      (e.VERIFIED_RESOLUTIONS || "").split(",").map((v) => v.trim()),
+    ),
     templates: TEMPLATES.map((t) => ({
       id: t.id,
       version: t.version,

@@ -7,6 +7,7 @@ import { allowedAdmin, unlockAdmin, requireAdminSession } from "./admin-access";
 import { grantCredits } from "./admin-credits";
 import { moderateInputs, resolveModerationMedia } from "./moderation";
 import { z } from "zod";
+import { RESOLUTIONS } from "./catalog";
 import { auth, identity, requireUser, sameOrigin, AppError } from "./auth";
 import {
   type Bindings,
@@ -28,6 +29,7 @@ import {
   processPaymentEvent,
 } from "./payments";
 import { imageInfo, validSignature } from "./media";
+import { recoverStoredOutput } from "./output-recovery";
 import { WaveSpeed } from "./providers/wavespeed";
 import {
   getTemplate,
@@ -438,12 +440,25 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
           subjectMode: z.enum(["human", "pet"]).default("pet"),
           assetA: z.string().uuid(),
           assetB: z.string().uuid(),
-          resolution: z.enum(["480p", "768p", "1080p"]),
+          resolution: z
+            .enum([...RESOLUTIONS, "768p"])
+            .transform((value) =>
+              value === "768p" ? ("720p" as const) : value,
+            ),
           templateId: z.string().min(1).max(50),
           requestKey: z.string().uuid(),
           consent: z.literal(true),
         })
         .parse(await body(r));
+      const existing = await e.DB.prepare(
+        "SELECT id FROM video_tasks WHERE user_id=? AND request_key=?",
+      )
+        .bind(u.id, b.requestKey)
+        .first();
+      if (existing) {
+        const { task } = await reserveTask(e.DB, u.id, b, mock);
+        return json(task, 201);
+      }
       if (!mock && !liveResolutions(e).includes(b.resolution))
         throw new AppError(
           503,
@@ -471,13 +486,7 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
             template,
             e.MEDIA_SIGNING_SECRET!,
           );
-      const existing = await e.DB.prepare(
-        "SELECT id FROM video_tasks WHERE user_id=? AND request_key=?",
-      )
-        .bind(u.id, b.requestKey)
-        .first();
-      const checkedURLs =
-        !mock && !existing ? await moderateInputs(e, u.id, b) : null;
+      const checkedURLs = mock ? null : await moderateInputs(e, u.id, b);
       const result = await reserveTask(e.DB, u.id, b, mock);
       if (result.created) {
         if (mock) {
@@ -526,7 +535,10 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
       )
         .bind(u.id)
         .all<TaskRow>();
-      if (mock) for (const t of rows.results) await advanceMock(e, t);
+      for (const t of rows.results) {
+        if (mock) await advanceMock(e, t);
+        await recoverStoredOutput(e, t);
+      }
       return json(
         (
           await e.DB.prepare(
@@ -561,10 +573,9 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
         );
       }
       if (r.method === "GET" && parts.length === 2) {
-        if (mock) {
-          await advanceMock(e, t);
-          t = await ownedTask(e, r, t.id);
-        }
+        if (mock) await advanceMock(e, t);
+        const recovered = await recoverStoredOutput(e, t);
+        if (mock || recovered) t = await ownedTask(e, r, t.id);
         return json(t);
       }
     }

@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { configuredResolutions } from "./catalog";
 import { verifiedTemplates } from "./templates";
 export interface Bindings {
   DB: D1Database;
@@ -62,8 +63,7 @@ export function liveResolutions(e: Bindings): string[] {
     e.REFERENCE_LICENSE_CONFIRMED !== "true"
   )
     return [];
-  return (e.VERIFIED_RESOLUTIONS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => ["480p", "768p", "1080p"].includes(s));
+  return configuredResolutions(
+    (e.VERIFIED_RESOLUTIONS || "").split(",").map((s) => s.trim()),
+  );
 }
