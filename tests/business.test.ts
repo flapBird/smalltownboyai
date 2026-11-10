@@ -2050,3 +2050,26 @@ it("recovers a stored review task when its owner opens the video list, without a
     )?.n,
   ).toBe(1);
 });
+
+it("keeps an older active task visible in the studio alongside recent videos", async () => {
+  const u = await user(1000);
+  const { task: active } = await reserveTask(db, u.id, input(u.assets), true);
+  await db
+    .prepare("UPDATE video_tasks SET created_at=0 WHERE id=?")
+    .bind(active.id)
+    .run();
+  for (let i = 0; i < 5; i++) {
+    const { task } = await reserveTask(db, u.id, input(u.assets), true);
+    await settleTask(db, task.id, true, "output-" + i);
+  }
+  const response = await handle(
+    new Request("http://localhost/api/tasks?view=studio", {
+      headers: await authenticated(u.id),
+    }),
+    e,
+  );
+  expect(response.status).toBe(200);
+  const rows = (await response.json()) as { id: string; status: string }[];
+  expect(rows).toHaveLength(5);
+  expect(rows[0]).toMatchObject({ id: active.id, status: "queued" });
+});

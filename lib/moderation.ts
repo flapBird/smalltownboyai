@@ -4,7 +4,7 @@ import type { Bindings } from "./env";
 import { AppError } from "./auth";
 import { imageInfo, signature, validSignature } from "./media";
 import { generationPrompt, type SubjectMode } from "./providers/wavespeed";
-import { SPECS, type Resolution } from "./catalog";
+import { ACTIVE_TASK_LIMIT, SPECS, type Resolution } from "./catalog";
 import { getTemplate } from "./templates";
 
 export const POLICY = "seeapi-strict-v1";
@@ -569,11 +569,16 @@ export async function moderateInputs(
   const paused = await e.DB.prepare(
     "SELECT value FROM settings WHERE key='generation_paused'",
   ).first<{ value: string }>();
+  if ((active?.n ?? 0) >= ACTIVE_TASK_LIMIT)
+    throw new AppError(
+      409,
+      "Both video slots are in use. Try again when one finishes.",
+      "ACTIVE_TASK_LIMIT",
+    );
   if (
     !wallet ||
     wallet.balance < spec.credits ||
     wallet.tier < spec.tier ||
-    (active?.n ?? 0) >= 2 ||
     paused?.value !== "false"
   )
     throw new AppError(

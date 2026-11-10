@@ -125,6 +125,7 @@ async function advanceMock(e: Bindings, t: TaskRow) {
   )
     .bind(t.id)
     .run();
+  return true;
 }
 export async function handle(r: Request, e: Bindings): Promise<Response> {
   try {
@@ -530,23 +531,19 @@ export async function handle(r: Request, e: Bindings): Promise<Response> {
       return json(await ownedTask(e, r, result.task.id), 201);
     }
     if (r.method === "GET" && path === "tasks") {
-      const rows = await e.DB.prepare(
-        "SELECT * FROM video_tasks WHERE user_id=? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100",
-      )
-        .bind(u.id)
-        .all<TaskRow>();
+      const query = e.DB.prepare(
+        url.searchParams.get("view") === "studio"
+          ? "SELECT * FROM video_tasks WHERE user_id=? AND deleted_at IS NULL ORDER BY (status NOT IN ('completed','failed')) DESC, created_at DESC LIMIT 5"
+          : "SELECT * FROM video_tasks WHERE user_id=? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100",
+      ).bind(u.id);
+      const rows = await query.all<TaskRow>();
+      let changed = false;
       for (const t of rows.results) {
-        if (mock) await advanceMock(e, t);
-        await recoverStoredOutput(e, t);
+        if (mock && (await advanceMock(e, t))) changed = true;
+        if (await recoverStoredOutput(e, t)) changed = true;
       }
       return json(
-        (
-          await e.DB.prepare(
-            "SELECT * FROM video_tasks WHERE user_id=? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100",
-          )
-            .bind(u.id)
-            .all()
-        ).results,
+        changed ? (await query.all<TaskRow>()).results : rows.results,
       );
     }
     if (parts[0] === "tasks" && parts[1]) {

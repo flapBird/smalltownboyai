@@ -1,3 +1,5 @@
+export const ACTIVE_TASK_LIMIT = 2;
+
 export const SITE = {
   name: "Smalltown Boy AI",
   origin: "https://smalltownboyai.one",
@@ -73,7 +75,7 @@ export const FAQ = [
   ],
   [
     "How long does generation take?",
-    "AI generation is asynchronous. Actual processing times are still being measured; we do not promise a completion time. You can leave the page and check the task in My Videos.",
+    "AI generation is asynchronous. Actual processing times are still being measured; we do not promise a completion time. You can have two active videos at once, start another after submission, and check progress in the studio or My Videos.",
   ],
   [
     "Can I download the result, and is music included?",

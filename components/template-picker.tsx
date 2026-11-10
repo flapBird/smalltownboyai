@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Check, X, ArrowUpRight, Film } from "lucide-react";
+import { Check, X, ChevronRight, Film } from "lucide-react";
 import type { PublicTemplate } from "@/lib/templates";
 import { PreviewVideo } from "./preview-video";
 
@@ -50,6 +50,11 @@ export function TemplatePicker({
         className="template-switch"
         disabled={disabled || !selected}
         aria-haspopup="dialog"
+        aria-label={
+          selected
+            ? `Change dance template: ${selected.name}`
+            : "Loading dance templates"
+        }
         onClick={() => {
           setCandidate(selectedId);
           setOpen(true);
@@ -59,11 +64,12 @@ export function TemplatePicker({
         <span>
           <small>DANCE TEMPLATE</small>
           <strong>{selected?.name || "Loading templates…"}</strong>
-          <em>
-            Change template <ArrowUpRight size={13} />
-          </em>
         </span>
-        <span className="template-count">02</span>
+        <ChevronRight
+          className="template-chevron"
+          size={18}
+          aria-hidden="true"
+        />
       </button>
       <dialog
         ref={dialog}

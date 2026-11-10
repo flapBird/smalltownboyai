@@ -12,6 +12,9 @@ import {
   ShieldCheck,
   Loader2,
   Download,
+  Check,
+  Film,
+  Play,
   AlertCircle,
 } from "lucide-react";
 import {
@@ -23,15 +26,21 @@ import { readApiResponse } from "@/lib/client-response";
 import { normalizePhoto } from "@/lib/normalize-photo";
 import { TemplatePicker } from "./template-picker";
 import { Button } from "./ui/button";
-import { SPECS, currentResolution, type Resolution } from "@/lib/catalog";
+import {
+  ACTIVE_TASK_LIMIT,
+  SPECS,
+  currentResolution,
+  type Resolution,
+} from "@/lib/catalog";
 import type { PublicTemplate } from "@/lib/templates";
-type Photo = { url: string; id?: string; sample?: boolean };
+type Photo = { url: string; id?: string };
 type Task = {
   id: string;
   status: string;
   resolution: string;
   error_code?: string;
-  output_key?: string;
+  template_id?: string;
+  created_at: number;
 };
 async function api(path: string, body?: unknown) {
   const r = await fetch(
@@ -82,14 +91,38 @@ function restoreDraft(key: string): Promise<File | undefined> {
     };
   });
 }
-async function clearDraft(key: string) {
-  const req = indexedDB.open("smalltown-drafts", 1);
-  req.onsuccess = () => {
-    const db = req.result;
-    const tx = db.transaction("photos", "readwrite");
-    tx.objectStore("photos").delete(key);
-    tx.oncomplete = () => db.close();
-  };
+function clearDrafts(keys: string[]) {
+  return new Promise<void>((resolve) => {
+    const req = indexedDB.open("smalltown-drafts", 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("photos");
+    req.onerror = () => resolve();
+    req.onsuccess = () => {
+      const db = req.result;
+      const tx = db.transaction("photos", "readwrite");
+      for (const key of keys) tx.objectStore("photos").delete(key);
+      tx.oncomplete = tx.onabort = () => {
+        db.close();
+        resolve();
+      };
+    };
+  });
+}
+const isActive = (task: Task) => !["completed", "failed"].includes(task.status);
+const isWaiting = (task: Task) =>
+  ["queued", "submitting", "processing"].includes(task.status);
+function taskLabel(task: Task) {
+  if (task.status === "completed") return "Ready";
+  if (task.status === "failed") return "Failed · credits returned";
+  if (task.status === "review") return "Needs review";
+  if (task.status === "unknown") return "Needs attention";
+  if (task.status === "queued") return "Queued";
+  if (task.status === "submitting") return "Starting";
+  if (
+    task.error_code?.startsWith("OUTPUT_") ||
+    task.error_code === "INVALID_MP4"
+  )
+    return "Waiting to save";
+  return "Generating";
 }
 export function Generator() {
   const [photos, setPhotos] = useState<(Photo | null)[]>([null, null]);
@@ -108,7 +141,15 @@ export function Generator() {
   });
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
-  const [task, setTask] = useState<Task | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [queueRevision, refreshQueue] = useState(0);
+  const [queueError, setQueueError] = useState(false);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const queueVersion = useRef(0);
+  const taskSnapshot = useRef<Task[]>([]);
+  const photoUrls = useRef<string[]>([]);
+  const draftVersion = useRef(0);
   const [consent, setConsent] = useState(false);
   const inputs = [
     useRef<HTMLInputElement>(null),
@@ -173,48 +214,87 @@ export function Generator() {
     api("me")
       .then(setUser)
       .catch(() => {});
+    const version = draftVersion.current;
     for (let i = 0; i < 2; i++)
       restoreDraft(String(i)).then((f) => {
-        if (f)
+        if (f && draftVersion.current === version)
           setPhotos((p) =>
             p.map((v, n) => (n === i ? { url: URL.createObjectURL(f) } : v)),
           );
       });
-    const id = localStorage.getItem("smalltown-task");
-    if (id)
-      api("tasks/" + id)
-        .then((t) => {
-          setTask(t);
-          setSubjectMode(t.subject_mode ?? "pet");
-        })
-        .catch((error) => {
-          if (error.status === 404) localStorage.removeItem("smalltown-task");
-          else setMessage(error.message);
-        });
   }, []);
+
   useEffect(() => {
-    if (!task || ["completed", "failed", "unknown"].includes(task.status))
-      return;
-    const timer = setInterval(
-      () =>
-        api("tasks/" + task.id)
-          .then((t) => {
-            setTask(t);
-            setMessage("");
-            if (t.status === "completed" || t.status === "failed")
-              api("me").then((u) => {
-                setUser(u);
-                window.dispatchEvent(new Event("wallet-updated"));
-              });
-          })
-          .catch((e) => setMessage(e.message)),
-      3000,
-    );
-    return () => clearInterval(timer);
-  }, [task?.id, task?.status]);
+    const next = photos.flatMap((p) => (p ? [p.url] : []));
+    for (const url of photoUrls.current)
+      if (!next.includes(url)) URL.revokeObjectURL(url);
+    photoUrls.current = next;
+  }, [photos]);
+
+  function refreshWallet(owner: string) {
+    void api("me")
+      .then((fresh) => {
+        setUser((current) =>
+          current?.id === owner && fresh.id === owner ? fresh : current,
+        );
+        window.dispatchEvent(new Event("wallet-updated"));
+      })
+      .catch(() => {});
+  }
+
+  useEffect(() => {
+    const owner = user?.id;
+    if (!owner) return;
+    let stopped = false;
+    let running = false;
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      if (stopped || running || document.hidden) return;
+      clearTimeout(timer);
+      running = true;
+      const version = queueVersion.current;
+      let again = false;
+      try {
+        const next: Task[] = await api("tasks?view=studio");
+        if (stopped || version !== queueVersion.current) return;
+        if (
+          taskSnapshot.current.some(
+            (previous) =>
+              isActive(previous) &&
+              next.some(
+                (current) => current.id === previous.id && !isActive(current),
+              ),
+          )
+        )
+          refreshWallet(owner!);
+        taskSnapshot.current = next;
+        setTasks(next);
+        setQueueError(false);
+        again = next.some(isActive);
+      } catch (e) {
+        if (!stopped && version === queueVersion.current) {
+          setQueueError(true);
+          again = (e as { status?: number }).status !== 401;
+        }
+      } finally {
+        running = false;
+        if (!stopped && again) timer = setTimeout(poll, 5000);
+      }
+    }
+    void poll();
+    document.addEventListener("visibilitychange", poll);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", poll);
+    };
+  }, [user?.id, queueRevision]);
+
   async function choose(i: number, file?: File) {
     if (!file || pending) return;
     setMessage("");
+    setSubmitted(false);
+    setConsent(false);
     if (
       !["image/jpeg", "image/png"].includes(file.type) ||
       file.size > 8 * 1024 * 1024
@@ -269,6 +349,7 @@ export function Generator() {
   }, []);
   async function generate() {
     setMessage("");
+    setSubmitted(false);
     if (pending && user?.id === pending.owner) {
       await continueGeneration(pending);
       return;
@@ -380,15 +461,29 @@ export function Generator() {
         throw new Error(
           "Checks are taking longer than expected. Your request is saved. Resume to check again; do not upload the photos again.",
         );
-      localStorage.setItem("smalltown-task", t.id);
+      // The server now owns this task. Reset only the draft; status polling
+      // follows the account's tasks independently of the next submission.
+      queueVersion.current++;
+      const next = [
+        t,
+        ...taskSnapshot.current.filter((row) => row.id !== t.id),
+      ].slice(0, 5);
+      taskSnapshot.current = next;
+      setTasks(next);
+      setSubmitted(true);
+      setMessage("");
+      draftVersion.current++;
+      setPhotos([null, null]);
+      setConsent(false);
+      setSubjectMode("human");
+      for (const input of inputs) if (input.current) input.current.value = "";
+      key.current = null;
+      refreshQueue((n) => n + 1);
+      refreshWallet(saved.owner);
+      await clearDrafts(["0", "1"]);
+      localStorage.removeItem("smalltown-task");
       localStorage.removeItem(PENDING_GENERATION_KEY);
       setPending(null);
-      setTask(t);
-      setMessage("");
-      await api("me").then((u) => {
-        setUser(u);
-        window.dispatchEvent(new Event("wallet-updated"));
-      });
     } catch (e) {
       const corrupt = (e as { code?: string }).code === "INPUT_IMAGE_CORRUPT";
       if (corrupt) {
@@ -411,14 +506,14 @@ export function Generator() {
         );
         key.current = null;
       }
-      const terminal = [
-        "SAFETY_BLOCKED",
-        "SAFETY_UNAVAILABLE",
-        "INPUT_IMAGE_CORRUPT",
-      ].includes((e as { code?: string }).code || "");
+      const { status, code } = e as { status?: number; code?: string };
+      const terminal =
+        [400, 409, 422].includes(status ?? 0) || code === "SAFETY_UNAVAILABLE";
+      if (status === 409) refreshQueue((n) => n + 1);
       if (terminal) {
         localStorage.removeItem(PENDING_GENERATION_KEY);
         setPending(null);
+        key.current = null;
       }
       if (mounted.current)
         setMessage(
@@ -434,19 +529,13 @@ export function Generator() {
       }
     }
   }
-  const safetyHold =
-    task?.status === "review" &&
-    ["SAFETY_BLOCKED", "SAFETY_UNAVAILABLE"].includes(task.error_code || "");
-  const active = task && !["completed", "failed"].includes(task.status);
+  const activeCount = tasks.filter(isActive).length;
+  const atLimit = activeCount >= ACTIVE_TASK_LIMIT;
+  const locked = !!busy || !!pending;
   useEffect(() => {
     const select = (event: Event) => {
       const id = (event as CustomEvent).detail;
-      if (
-        !active &&
-        !busy &&
-        !pending &&
-        config.templates.some((t) => t.id === id)
-      ) {
+      if (!locked && config.templates.some((t) => t.id === id)) {
         setTemplateId(id);
         localStorage.setItem("smalltown-template", id);
         key.current = null;
@@ -455,7 +544,7 @@ export function Generator() {
     window.addEventListener("smalltown-template-selected", select);
     return () =>
       window.removeEventListener("smalltown-template-selected", select);
-  }, [active, busy, pending, config.templates]);
+  }, [locked, config.templates]);
   const selectedTemplate = config.templates.find((t) => t.id === templateId);
   return (
     <section id="create" className="studio-create">
@@ -491,7 +580,7 @@ export function Generator() {
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault();
-                    if (!busy && !active) choose(i, e.dataTransfer.files[0]);
+                    if (!locked) choose(i, e.dataTransfer.files[0]);
                   }}
                 >
                   {photos[i] ? (
@@ -504,12 +593,13 @@ export function Generator() {
                         type="button"
                         className="pet-remove"
                         aria-label={"Remove character " + (i === 0 ? "A" : "B")}
-                        disabled={!!busy || !!active || !!pending}
+                        disabled={locked}
                         onClick={() => {
                           setPhotos((p) =>
                             p.map((v, n) => (n === i ? null : v)),
                           );
-                          clearDraft(String(i));
+                          void clearDrafts([String(i)]);
+                          setConsent(false);
                           key.current = null;
                         }}
                       >
@@ -518,7 +608,7 @@ export function Generator() {
                       <button
                         type="button"
                         className="pet-change"
-                        disabled={!!busy || !!active || !!pending}
+                        disabled={locked}
                         onClick={() => inputs[i].current?.click()}
                       >
                         <Upload size={15} />
@@ -529,7 +619,7 @@ export function Generator() {
                     <button
                       type="button"
                       className="pet-upload-empty"
-                      disabled={!!busy || !!active || !!pending}
+                      disabled={locked}
                       onClick={() => inputs[i].current?.click()}
                     >
                       <span className="upload-plus">
@@ -549,7 +639,7 @@ export function Generator() {
                     type="file"
                     accept="image/jpeg,image/png"
                     ref={inputs[i]}
-                    disabled={!!busy || !!active || !!pending}
+                    disabled={locked}
                     onChange={(e) => choose(i, e.target.files?.[0])}
                   />
                 </div>
@@ -564,25 +654,21 @@ export function Generator() {
               <Music2 size={21} />
             </div>
           </div>
-          <div className="studio-upload-footer">
-            <span>
-              <ShieldCheck size={15} />
-              Your photos stay private.
-            </span>
-            <button
-              type="button"
-              onClick={samples}
-              disabled={!!busy || !!active || !!pending}
-            >
-              Try sample photos <ArrowUpRight size={14} />
-            </button>
-          </div>
+        </div>
+        <div className="studio-upload-footer">
+          <span>
+            <ShieldCheck size={15} />
+            Your photos stay private.
+          </span>
+          <button type="button" onClick={samples} disabled={locked}>
+            Try sample photos <ArrowUpRight size={14} />
+          </button>
         </div>
         <aside className="studio-settings" aria-label="Video settings">
           <TemplatePicker
             templates={config.templates}
             selectedId={templateId}
-            disabled={!!busy || !!active || !!pending}
+            disabled={locked}
             onSelect={(id) => {
               setTemplateId(id);
               localStorage.setItem("smalltown-template", id);
@@ -598,10 +684,7 @@ export function Generator() {
                   key={r}
                   aria-pressed={resolution === r}
                   disabled={
-                    !!busy ||
-                    !!active ||
-                    !!pending ||
-                    (!config.mock && !config.resolutions.includes(r))
+                    locked || (!config.mock && !config.resolutions.includes(r))
                   }
                   className={resolution === r ? "selected" : ""}
                   onClick={() => {
@@ -625,7 +708,7 @@ export function Generator() {
                   type="button"
                   aria-pressed={subjectMode === mode}
                   className={subjectMode === mode ? "selected" : ""}
-                  disabled={!!busy || !!active || !!pending}
+                  disabled={locked}
                   onClick={() => {
                     setSubjectMode(mode);
                     setConsent(false);
@@ -658,164 +741,174 @@ export function Generator() {
             <input
               type="checkbox"
               checked={consent}
+              disabled={locked}
               onChange={(e) => setConsent(e.target.checked)}
             />
             <span>
               {subjectMode === "human"
-                ? "I am 18+, both people shown are adults and have agreed to this AI video. I own or have permission to use these photos."
-                : "I own these pet photos or have permission to use them."}{" "}
-              Live generation uses safety checks; see our{" "}
+                ? "I’m 18+, both people are adults and consent to this video, and I have permission to use the photos."
+                : "I have permission to use these pet photos."}{" "}
               <a href="/privacy">Privacy Policy</a>.
             </span>
           </label>
-          <Button
-            className="studio-generate"
-            onClick={generate}
-            disabled={!!busy || !!active}
-          >
-            {busy === "generate" ? (
-              <>
-                <Loader2 className="spin" size={18} />
-                {checkingInputs
-                  ? "Checking your inputs…"
-                  : "Uploading your photos…"}
-              </>
-            ) : active ? (
-              <>
-                <Loader2 className={safetyHold ? "" : "spin"} size={18} />
-                {safetyHold ? "Video held for review" : `Task ${task.status}`}
-              </>
-            ) : (
-              <>
-                <Sparkles size={18} />
-                {pending
-                  ? "Resume saved request"
-                  : !user
-                    ? "Sign in to create your video"
-                    : user.wallet.balance < SPECS[resolution].credits
-                      ? "Buy credits to create"
-                      : "Create Your AI Video"}
-                <ArrowUpRight size={17} />
-              </>
-            )}
-          </Button>
-          <p className="studio-service-note">
-            {config.mock
-              ? "Local demo · no payment or AI call"
-              : config.generation && selectedTemplate?.available
-                ? "14-second MP4 · template audio included"
-                : "Live generation is coming soon."}
-          </p>
-          {pending && (
-            <p className="status-note" role="status">
-              Request saved · {Math.floor(elapsed / 60)}m {elapsed % 60}s
-              elapsed. You can refresh this page; we’ll restore this request
-              without uploading again.
+          <div className="studio-settings-action">
+            <Button
+              className="studio-generate"
+              onClick={generate}
+              disabled={!!busy || (!!user && !pending && atLimit)}
+            >
+              {busy === "generate" ? (
+                <>
+                  <Loader2 className="spin" size={18} />
+                  {checkingInputs
+                    ? "Checking your inputs…"
+                    : "Uploading your photos…"}
+                </>
+              ) : (
+                <>
+                  <Sparkles size={18} />
+                  {pending
+                    ? "Resume saved request"
+                    : !user
+                      ? "Sign in to create your video"
+                      : atLimit
+                        ? "Both video slots are in use"
+                        : user.wallet.balance < SPECS[resolution].credits
+                          ? "Buy credits to create"
+                          : "Generate video"}
+                  <ArrowUpRight size={17} />
+                </>
+              )}
+            </Button>
+            <p className="studio-service-note">
+              {config.mock
+                ? "Local demo · no payment or AI call"
+                : config.generation && selectedTemplate?.available
+                  ? "14-second MP4 · template audio included"
+                  : "Live generation is coming soon."}
             </p>
-          )}
+          </div>
+        </aside>
+      </div>
+      {(pending || message || submitted) && (
+        <div className="studio-feedback" aria-live="polite">
           {message && (
             <div
               className={checkingInputs ? "status-note" : "error"}
               role={checkingInputs ? "status" : "alert"}
             >
               {checkingInputs ? (
-                <Loader2 size={16} className="animate-spin" />
+                <Loader2 size={15} className="spin" />
               ) : (
-                <AlertCircle size={16} />
+                <AlertCircle size={15} />
               )}
               {message}
             </div>
           )}
-        </aside>
-      </div>
-      {task && (
-        <div className="studio-result" aria-live="polite">
-          <div className="studio-result-media">
-            {task.status === "completed" ? (
-              <video
-                controls
-                playsInline
-                src={"/api/tasks/" + task.id + "/video"}
-              />
-            ) : (
-              <div className="studio-progress">
-                <Loader2
-                  className={
-                    task.status === "failed" || safetyHold ? "" : "spin"
-                  }
-                  size={34}
-                />
-                <span>
-                  {task.status === "failed"
-                    ? "This one missed a beat"
-                    : task.status === "review"
-                      ? safetyHold
-                        ? "Video held for review"
-                        : "Checking your video"
-                      : task.status === "unknown"
-                        ? "Checking your submission"
-                        : "Your duo is taking shape"}
-                </span>
-              </div>
-            )}
-          </div>
-          <div>
-            <span className="studio-kicker">YOUR CREATION</span>
-            <h3>
-              {task.status === "completed"
-                ? "Ready for its close-up."
-                : safetyHold
-                  ? "Your video needs review."
-                  : "A little dance in the making."}
-            </h3>
-            <p>
-              {task.status === "failed"
-                ? "Reserved credits have been returned."
-                : task.status === "completed"
-                  ? config.mock
-                    ? "Test animation · 480 × 854 · 3 seconds"
-                    : "Your private video is ready to download."
-                  : task.status === "review"
-                    ? task.error_code === "SAFETY_BLOCKED"
-                      ? "Automated safety checks flagged this video. It is not still generating. The video remains private; contact support if you believe this is a mistake."
-                      : task.error_code === "SAFETY_UNAVAILABLE"
-                        ? "Safety checks could not finish. Your video remains private; contact support for review."
-                        : "Checking your video automatically. It will be ready to download when checks pass."
-                    : task.error_code?.startsWith("OUTPUT_") ||
-                        task.error_code === "INVALID_MP4"
-                      ? "The provider finished, but we could not save its video yet. Your task is saved; no new generation will be started. Support can resolve the download issue."
-                      : task.error_code === "JOBS_CONFIGURATION_MISSING"
-                        ? "This task is waiting for a service configuration fix. Your request is saved; do not submit it again."
-                        : "Your task is saved. You can check back in My Videos."}
+          {pending && (
+            <p className="status-note">
+              Draft saved · {Math.floor(elapsed / 60)}m {elapsed % 60}s elapsed.
+              Refreshing won’t upload your photos again.
             </p>
-            <small>
-              Task {task.id.slice(0, 8)} · {task.resolution}
-              {config.mock ? " requested" : ""}
-            </small>
-            {task.status === "completed" && (
-              <a
-                className="button button-primary"
-                href={"/api/tasks/" + task.id + "/video?download=1"}
-              >
-                <Download size={17} />
-                Download {config.mock ? "test MP4" : "MP4"}
-              </a>
-            )}
-            {["completed", "failed"].includes(task.status) && (
-              <button
-                type="button"
-                className="text-link"
-                onClick={() => {
-                  setTask(null);
-                  key.current = null;
-                  localStorage.removeItem("smalltown-task");
-                }}
-              >
-                Create another video <ArrowUpRight size={15} />
-              </button>
-            )}
-          </div>
+          )}
+          {submitted && !pending && (
+            <p className="studio-submit-success" role="status">
+              <Check size={16} /> Request saved. Track it below or add photos
+              for another video.
+            </p>
+          )}
         </div>
+      )}
+      {(tasks.length > 0 || queueError) && (
+        <section
+          className="studio-task-list"
+          aria-labelledby="studio-tasks-heading"
+        >
+          <div className="studio-task-header">
+            <div>
+              <h3 id="studio-tasks-heading">Your videos</h3>
+              <p>
+                {activeCount} of {ACTIVE_TASK_LIMIT} active slots in use
+              </p>
+            </div>
+            <a className="text-link" href="/dashboard/videos">
+              My Videos <ArrowUpRight size={14} />
+            </a>
+          </div>
+          {queueError && (
+            <p className="status-note">
+              Couldn’t refresh video status. Open My Videos to check.
+            </p>
+          )}
+          <ul>
+            {tasks.map((task) => {
+              const ready = task.status === "completed";
+              const label = taskLabel(task);
+              const template = config.templates.find(
+                (t) => t.id === task.template_id,
+              );
+              return (
+                <li key={task.id} className="studio-task">
+                  <div className="studio-task-row">
+                    <span className="studio-task-icon" aria-hidden="true">
+                      <Film size={17} />
+                    </span>
+                    <div className="studio-task-info">
+                      <strong>{template?.name ?? "Dance video"}</strong>
+                      <small>
+                        {task.resolution} · {task.id.slice(0, 8)}
+                      </small>
+                    </div>
+                    <span
+                      className="studio-task-status"
+                      data-status={task.status}
+                    >
+                      {isWaiting(task) && (
+                        <Loader2
+                          size={13}
+                          className="spin"
+                          aria-hidden="true"
+                        />
+                      )}
+                      {ready && <Check size={14} aria-hidden="true" />}
+                      {label}
+                    </span>
+                    {ready && (
+                      <div className="studio-task-actions">
+                        <button
+                          type="button"
+                          className="studio-task-button"
+                          aria-expanded={previewId === task.id}
+                          onClick={() =>
+                            setPreviewId(previewId === task.id ? null : task.id)
+                          }
+                        >
+                          <Play size={14} />{" "}
+                          {previewId === task.id ? "Close preview" : "Preview"}
+                        </button>
+                        <a
+                          className="studio-task-button"
+                          href={`/api/tasks/${task.id}/video?download=1`}
+                          aria-label="Download MP4"
+                        >
+                          <Download size={15} />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                  {ready && previewId === task.id && (
+                    <video
+                      className="studio-task-preview"
+                      controls
+                      playsInline
+                      src={`/api/tasks/${task.id}/video`}
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
     </section>
   );

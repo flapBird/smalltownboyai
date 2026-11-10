@@ -1,4 +1,9 @@
-import { SPECS, currentResolution, type Resolution } from "./catalog";
+import {
+  ACTIVE_TASK_LIMIT,
+  SPECS,
+  currentResolution,
+  type Resolution,
+} from "./catalog";
 import { AppError } from "./auth";
 import { WAN_MODEL, estimateCost } from "./providers/wavespeed";
 import { getTemplate } from "./templates";
@@ -69,7 +74,7 @@ export async function reserveTask(
       .prepare(
         `INSERT OR IGNORE INTO video_tasks (id,user_id,request_key,status,resolution,credits,asset_a,asset_b,provider,model,template_id,template_version,input_duration,estimated_cost,created_at,updated_at,subject_mode)
  SELECT ?,?,?,'queued',?,?,?,?,?,?,?,?,?,?,?,?,? FROM user_wallets w WHERE w.user_id=? AND w.balance>=? AND w.tier>=?
- AND (SELECT COUNT(*) FROM video_tasks WHERE user_id=? AND status NOT IN ('completed','failed'))<2
+ AND (SELECT COUNT(*) FROM video_tasks WHERE user_id=? AND status NOT IN ('completed','failed'))<${ACTIVE_TASK_LIMIT}
  AND (SELECT value FROM settings WHERE key='generation_paused')='false'
  AND EXISTS (SELECT 1 FROM media_assets WHERE id=? AND user_id=? AND moderation='approved')
  AND EXISTS (SELECT 1 FROM media_assets WHERE id=? AND user_id=? AND moderation='approved')`,
